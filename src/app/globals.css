@@ -1,0 +1,11 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-mono), "SF Mono", "Fira Code", monospace;
+  background: #0a0a1a;
+  color: #e0e0e0;
+}

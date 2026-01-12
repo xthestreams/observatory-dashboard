@@ -1,0 +1,21 @@
+[Unit]
+Description=Observatory Data Collector
+After=network-online.target mosquitto.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/observatory-collector
+ExecStart=/usr/bin/python3 /home/pi/observatory-collector/collector.py
+Restart=always
+RestartSec=10
+EnvironmentFile=/home/pi/observatory-collector/.env
+SupplementaryGroups=dialout
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=observatory-collector
+
+[Install]
+WantedBy=multi-user.target

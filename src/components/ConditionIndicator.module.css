@@ -1,0 +1,39 @@
+.indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem;
+  background: rgba(30, 58, 95, 0.2);
+  border-radius: 8px;
+  border: 1px solid rgba(96, 165, 250, 0.1);
+  transition: all 0.3s ease;
+}
+
+.indicator:hover {
+  background: rgba(30, 58, 95, 0.3);
+  transform: translateY(-2px);
+}
+
+.icon {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.label {
+  font-size: 0.75rem;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.status {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-top: 0.25rem;
+}
+
+.detail {
+  font-size: 0.8rem;
+  color: #aaa;
+  margin-top: 0.25rem;
+}

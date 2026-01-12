@@ -1,0 +1,230 @@
+.dashboard {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0a0a1a 0%, #1a1a3a 50%, #0d0d20 100%);
+}
+
+.loadingScreen {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #0a0a1a;
+  color: #60a5fa;
+}
+
+.loader {
+  width: 50px;
+  height: 50px;
+  border: 3px solid #1e3a5f;
+  border-top-color: #60a5fa;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 2rem;
+  background: rgba(10, 10, 30, 0.8);
+  border-bottom: 1px solid rgba(96, 165, 250, 0.2);
+  backdrop-filter: blur(10px);
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.logoIcon {
+  font-size: 2.5rem;
+}
+
+.logoText h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #60a5fa;
+  margin: 0;
+  letter-spacing: 0.05em;
+}
+
+.logoText p {
+  font-size: 0.85rem;
+  color: #888;
+  margin: 0;
+}
+
+.lastUpdate {
+  font-size: 0.8rem;
+  color: #666;
+  padding: 0.5rem 1rem;
+  background: rgba(30, 58, 95, 0.3);
+  border-radius: 6px;
+  border: 1px solid rgba(96, 165, 250, 0.1);
+}
+
+/* Main Grid */
+.mainGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 1.5rem;
+  padding: 2rem;
+  max-width: 1800px;
+  margin: 0 auto;
+}
+
+/* Panels */
+.panel {
+  background: rgba(20, 20, 40, 0.6);
+  border: 1px solid rgba(96, 165, 250, 0.15);
+  border-radius: 12px;
+  padding: 1.25rem;
+  backdrop-filter: blur(5px);
+  transition: border-color 0.3s ease;
+}
+
+.panel:hover {
+  border-color: rgba(96, 165, 250, 0.3);
+}
+
+.panelTitle {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #60a5fa;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0 0 1rem 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(96, 165, 250, 0.1);
+}
+
+/* Image containers */
+.imageContainer {
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #000;
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Forecast */
+.forecastLink {
+  display: block;
+}
+
+.forecastImage {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
+/* SQM */
+.sqmContent {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.sqmCurrent {
+  text-align: center;
+  padding: 1rem;
+  background: rgba(30, 58, 95, 0.3);
+  border-radius: 8px;
+}
+
+.sqmValue {
+  font-size: 3rem;
+  font-weight: 700;
+  color: #60a5fa;
+  line-height: 1;
+}
+
+.sqmUnit {
+  font-size: 0.85rem;
+  color: #888;
+  margin-top: 0.25rem;
+}
+
+.sqmTemp {
+  font-size: 0.75rem;
+  color: #666;
+  margin-top: 0.5rem;
+}
+
+/* Conditions */
+.conditionsPanel {
+  grid-column: span 1;
+}
+
+@media (min-width: 1200px) {
+  .conditionsPanel {
+    grid-column: span 2;
+  }
+}
+
+.conditionsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+@media (max-width: 600px) {
+  .conditionsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Weather */
+.weatherPanel {
+  grid-column: span 2;
+}
+
+@media (max-width: 900px) {
+  .weatherPanel {
+    grid-column: span 1;
+  }
+}
+
+.weatherlinkIframe {
+  width: 100%;
+  height: 400px;
+  border: none;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.weatherGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+@media (max-width: 600px) {
+  .weatherGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Footer */
+.footer {
+  text-align: center;
+  padding: 2rem;
+  color: #666;
+  font-size: 0.85rem;
+  border-top: 1px solid rgba(96, 165, 250, 0.1);
+}
