@@ -134,5 +134,34 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- To run manually: SELECT cleanup_old_readings();
--- To schedule (requires pg_cron): 
+-- To schedule (requires pg_cron):
 -- SELECT cron.schedule('cleanup', '0 3 * * *', 'SELECT cleanup_old_readings()');
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- STORAGE BUCKET FOR IMAGES
+-- Run this in Storage section or via SQL
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- Create storage bucket for allsky and satellite images
+-- NOTE: This must be done via Supabase Dashboard > Storage > Create bucket
+-- Bucket name: allsky-images
+-- Public bucket: Yes (for serving images)
+--
+-- Or via SQL (requires storage schema access):
+-- INSERT INTO storage.buckets (id, name, public)
+-- VALUES ('allsky-images', 'allsky-images', true)
+-- ON CONFLICT (id) DO NOTHING;
+--
+-- Storage bucket structure:
+-- allsky-images/
+--   ├── latest.jpg           (current AllSky camera image)
+--   ├── archive/             (timestamped AllSky images)
+--   └── bom-satellite/       (BOM satellite and radar imagery)
+--       ├── IDE00135.jpg     (Australia True Color)
+--       ├── IDE00135-RADAR.jpg (Radar Composite)
+--       ├── IDE00005.jpg     (Visible B&W)
+--       ├── IDE00006.jpg     (Infrared B&W)
+--       ├── IDE00153.jpg     (Hemisphere Full Disk)
+--       └── IDRxx[1-4].gif   (Weather radar - xx=station code, 1-4=range)
+--           e.g., IDR714.gif = Sydney 64km, IDR713.gif = Sydney 128km

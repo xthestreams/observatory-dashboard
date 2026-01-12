@@ -22,13 +22,14 @@ import json
 import time
 import threading
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+import socket
+
 import paho.mqtt.client as mqtt
 import requests
-import serial
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -44,12 +45,17 @@ CONFIG = {
     "api_key": os.getenv("API_KEY", ""),
     "mqtt_broker": os.getenv("MQTT_BROKER", "localhost"),
     "mqtt_port": int(os.getenv("MQTT_PORT", "1883")),
-    "cloudwatcher_port": os.getenv("CLOUDWATCHER_PORT", "/dev/ttyUSB0"),
-    "cloudwatcher_baud": int(os.getenv("CLOUDWATCHER_BAUD", "9600")),
-    "sqm_port": os.getenv("SQM_PORT", "/dev/ttyUSB1"),
-    "sqm_baud": int(os.getenv("SQM_BAUD", "115200")),
+    "sqm_host": os.getenv("SQM_HOST", ""),
+    "sqm_port": int(os.getenv("SQM_PORT", "10001")),
+    "weatherlink_host": os.getenv("WEATHERLINK_HOST", ""),
+    "weatherlink_interval": int(os.getenv("WEATHERLINK_INTERVAL", "30")),
+    "cloudwatcher_host": os.getenv("CLOUDWATCHER_HOST", ""),
+    "cloudwatcher_interval": int(os.getenv("CLOUDWATCHER_INTERVAL", "30")),
     "allsky_image_path": os.getenv("ALLSKY_IMAGE_PATH", "/home/pi/allsky/tmp/image.jpg"),
     "push_interval": int(os.getenv("PUSH_INTERVAL", "60")),
+    "bom_satellite_enabled": os.getenv("BOM_SATELLITE_ENABLED", "true").lower() == "true",
+    "bom_satellite_interval": int(os.getenv("BOM_SATELLITE_INTERVAL", "600")),
+    "bom_radar_station": os.getenv("BOM_RADAR_STATION", ""),  # e.g., "71" for Sydney
     "log_level": os.getenv("LOG_LEVEL", "INFO"),
 }
 
@@ -115,6 +121,8 @@ def on_mqtt_connect(client, userdata, flags, rc):
         client.subscribe("weather/#")
         client.subscribe("weewx/#")
         client.subscribe("lora/#")
+        client.subscribe("cloudwatcher/#")
+        client.subscribe("aag/#")
     else:
         logger.error(f"MQTT connection failed with code {rc}")
 
@@ -159,6 +167,74 @@ def on_mqtt_message(client, userdata, msg):
                 "last_update": datetime.utcnow().isoformat(),
             }
             data_store.update(lora_sensors=lora_sensors)
+
+        elif "cloudwatcher" in topic or "aag" in topic:
+            # AAG Cloudwatcher MQTT data
+            # Format: clouds=sky_temp, temp=ambient_temp, rain=sensor_value,
+            #         cloudsSafe/rainSafe/lightSafe/windSafe = "Safe"/"Unsafe"
+            updates = {}
+
+            # Sky and ambient temperature
+            sky_temp = payload.get("clouds")  # "clouds" is actually sky temperature
+            ambient_temp = payload.get("temp")
+
+            if sky_temp is not None:
+                updates["sky_temp"] = float(sky_temp)
+            if ambient_temp is not None:
+                updates["ambient_temp"] = float(ambient_temp)
+
+            # Cloud condition from cloudsSafe or calculate from temps
+            clouds_safe = payload.get("cloudsSafe", "")
+            if clouds_safe:
+                if clouds_safe == "Safe":
+                    updates["cloud_condition"] = "Clear"
+                else:
+                    updates["cloud_condition"] = "Cloudy"
+            elif sky_temp is not None and ambient_temp is not None:
+                updates["cloud_condition"] = classify_cloud_condition(float(sky_temp), float(ambient_temp))
+
+            # Rain condition
+            rain_safe = payload.get("rainSafe", "")
+            rain_val = payload.get("rain")
+            if rain_safe:
+                if rain_safe == "Safe":
+                    updates["rain_condition"] = "Dry"
+                else:
+                    updates["rain_condition"] = "Rain"
+            elif rain_val is not None:
+                updates["rain_condition"] = classify_rain_condition(int(rain_val))
+
+            # Light/day condition from lightmpsas (mag per square arcsec)
+            light_safe = payload.get("lightSafe", "")
+            light_mpsas = payload.get("lightmpsas")
+            if light_safe:
+                if light_safe == "Safe":
+                    updates["day_condition"] = "Dark"
+                else:
+                    updates["day_condition"] = "Light"
+            elif light_mpsas is not None:
+                # Higher mpsas = darker sky
+                if light_mpsas > 18:
+                    updates["day_condition"] = "Dark"
+                elif light_mpsas > 10:
+                    updates["day_condition"] = "Light"
+                else:
+                    updates["day_condition"] = "VeryLight"
+
+            # Wind condition
+            wind_safe = payload.get("windSafe", "")
+            wind_val = payload.get("wind")
+            if wind_safe:
+                if wind_safe == "Safe":
+                    updates["wind_condition"] = "Calm"
+                else:
+                    updates["wind_condition"] = "Windy"
+            elif wind_val is not None:
+                updates["wind_condition"] = classify_wind_condition(float(wind_val))
+
+            if updates:
+                logger.info(f"Cloudwatcher MQTT: {updates}")
+                data_store.update(**updates)
 
     except json.JSONDecodeError:
         logger.warning(f"Invalid JSON on topic {msg.topic}")
@@ -223,79 +299,42 @@ def classify_day_condition(light_sensor: int) -> str:
         return "VeryLight"
 
 
-def read_cloudwatcher():
-    port = CONFIG["cloudwatcher_port"]
-    baud = CONFIG["cloudwatcher_baud"]
-
-    if not Path(port).exists():
-        logger.warning(f"Cloudwatcher port {port} not found, skipping")
-        return
-
-    logger.info(f"Starting Cloudwatcher reader on {port}")
-
-    while True:
-        try:
-            with serial.Serial(port, baud, timeout=3) as ser:
-                while True:
-                    ser.write(b"A!")
-                    time.sleep(0.5)
-                    response = ser.readline().decode("ascii", errors="ignore").strip()
-
-                    if response.startswith("!1"):
-                        parts = response.split()
-                        if len(parts) >= 5:
-                            sky_temp = float(parts[1])
-                            ambient_temp = float(parts[2])
-                            rain_sensor = int(parts[3])
-                            light_sensor = int(parts[4])
-
-                            current = data_store.get_all()
-                            wind_speed = current.get("wind_speed")
-
-                            data_store.update(
-                                sky_temp=sky_temp,
-                                ambient_temp=ambient_temp,
-                                cloud_condition=classify_cloud_condition(sky_temp, ambient_temp),
-                                rain_condition=classify_rain_condition(rain_sensor),
-                                day_condition=classify_day_condition(light_sensor),
-                                wind_condition=classify_wind_condition(wind_speed),
-                            )
-                            logger.debug(f"Cloudwatcher: sky={sky_temp}°C, ambient={ambient_temp}°C")
-
-                    time.sleep(30)
-
-        except serial.SerialException as e:
-            logger.error(f"Cloudwatcher serial error: {e}")
-            time.sleep(60)
-        except Exception as e:
-            logger.error(f"Cloudwatcher error: {e}")
-            time.sleep(60)
-
-
 # ═══════════════════════════════════════════════════════════════════════════════
-# SQM READER
+# SQM READER (Cloudwatcher data comes via MQTT)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def read_sqm():
+    host = CONFIG["sqm_host"]
     port = CONFIG["sqm_port"]
-    baud = CONFIG["sqm_baud"]
 
-    if not Path(port).exists():
-        logger.warning(f"SQM port {port} not found, skipping")
+    if not host:
+        logger.warning("SQM host not configured, skipping")
         return
 
-    logger.info(f"Starting SQM reader on {port}")
+    logger.info(f"Starting SQM-LE reader on {host}:{port}")
 
     while True:
         try:
-            with serial.Serial(port, baud, timeout=3) as ser:
-                while True:
-                    ser.write(b"rx")
-                    time.sleep(0.5)
-                    response = ser.readline().decode("ascii", errors="ignore").strip()
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                sock.settimeout(10)
+                sock.connect((host, port))
+                logger.info(f"Connected to SQM-LE at {host}:{port}")
 
-                    if response.startswith("r,"):
-                        parts = response.split(",")
+                while True:
+                    sock.sendall(b"rx")
+                    time.sleep(0.5)
+
+                    response = b""
+                    while not response.endswith(b"\n"):
+                        chunk = sock.recv(256)
+                        if not chunk:
+                            raise ConnectionError("Connection closed")
+                        response += chunk
+
+                    response_str = response.decode("ascii", errors="ignore").strip()
+
+                    if response_str.startswith("r,"):
+                        parts = response_str.split(",")
                         if len(parts) >= 2:
                             mag_str = parts[1].strip()
                             sqm_value = float(mag_str.replace("m", "").strip())
@@ -314,12 +353,343 @@ def read_sqm():
 
                     time.sleep(60)
 
-        except serial.SerialException as e:
-            logger.error(f"SQM serial error: {e}")
+        except (socket.error, ConnectionError) as e:
+            logger.error(f"SQM connection error: {e}")
             time.sleep(60)
         except Exception as e:
             logger.error(f"SQM error: {e}")
             time.sleep(60)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# WEATHERLINK LIVE READER
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def fahrenheit_to_celsius(f: float) -> float:
+    """Convert Fahrenheit to Celsius."""
+    return (f - 32) * 5 / 9
+
+
+def inches_to_hpa(inches: float) -> float:
+    """Convert inches of mercury to hectopascals."""
+    return inches * 33.8639
+
+
+def read_weatherlink():
+    """Read weather data from WeatherLink Live local API."""
+    host = CONFIG["weatherlink_host"]
+    interval = CONFIG["weatherlink_interval"]
+
+    if not host:
+        logger.warning("WeatherLink host not configured, skipping")
+        return
+
+    url = f"http://{host}/v1/current_conditions"
+    logger.info(f"Starting WeatherLink Live reader at {url}")
+
+    while True:
+        try:
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+
+            if data.get("error"):
+                logger.warning(f"WeatherLink API error: {data['error']}")
+                time.sleep(interval)
+                continue
+
+            conditions = data.get("data", {}).get("conditions", [])
+
+            updates = {}
+
+            for condition in conditions:
+                data_type = condition.get("data_structure_type")
+
+                # Type 1 = ISS (Integrated Sensor Suite) - outdoor sensors
+                if data_type == 1:
+                    if condition.get("temp") is not None:
+                        updates["temperature"] = round(fahrenheit_to_celsius(condition["temp"]), 1)
+                    if condition.get("hum") is not None:
+                        updates["humidity"] = condition["hum"]
+                    if condition.get("dew_point") is not None:
+                        updates["dewpoint"] = round(fahrenheit_to_celsius(condition["dew_point"]), 1)
+                    if condition.get("wind_speed_last") is not None:
+                        # Convert mph to km/h
+                        updates["wind_speed"] = round(condition["wind_speed_last"] * 1.60934, 1)
+                    if condition.get("wind_dir_last") is not None:
+                        updates["wind_direction"] = condition["wind_dir_last"]
+                    if condition.get("wind_speed_hi_last_10_min") is not None:
+                        updates["wind_gust"] = round(condition["wind_speed_hi_last_10_min"] * 1.60934, 1)
+                    if condition.get("rain_rate_last") is not None:
+                        # rain_rate_last is in counts/hour, convert to mm/hr (0.2mm per count for metric)
+                        updates["rain_rate"] = round(condition["rain_rate_last"] * 0.2, 2)
+
+                # Type 3 = Barometer
+                elif data_type == 3:
+                    if condition.get("bar_sea_level") is not None:
+                        updates["pressure"] = round(inches_to_hpa(condition["bar_sea_level"]), 1)
+
+            if updates:
+                logger.info(f"WeatherLink: {updates}")
+                data_store.update(**updates)
+
+        except requests.RequestException as e:
+            logger.error(f"WeatherLink request error: {e}")
+        except Exception as e:
+            logger.error(f"WeatherLink error: {e}")
+
+        time.sleep(interval)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CLOUDWATCHER CGI READER
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def read_cloudwatcher_cgi():
+    """Read weather data from AAG Cloudwatcher CGI interface."""
+    host = CONFIG["cloudwatcher_host"]
+    interval = CONFIG["cloudwatcher_interval"]
+
+    if not host:
+        logger.warning("Cloudwatcher CGI host not configured, skipping")
+        return
+
+    url = f"http://{host}/cgi-bin/cgiLastData"
+    logger.info(f"Starting Cloudwatcher CGI reader at {url}")
+
+    while True:
+        try:
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+
+            # Parse key=value format
+            data = {}
+            for line in response.text.strip().split("\n"):
+                if "=" in line:
+                    key, value = line.split("=", 1)
+                    data[key.strip()] = value.strip()
+
+            updates = {}
+
+            # Sky and ambient temperature
+            if "clouds" in data:
+                updates["sky_temp"] = float(data["clouds"])
+            if "temp" in data:
+                updates["ambient_temp"] = float(data["temp"])
+
+            # Cloud condition (cloudsSafe: 1=safe/clear, 0=unsafe/cloudy)
+            if "cloudsSafe" in data:
+                updates["cloud_condition"] = "Clear" if data["cloudsSafe"] == "1" else "Cloudy"
+            elif "clouds" in data and "temp" in data:
+                updates["cloud_condition"] = classify_cloud_condition(
+                    float(data["clouds"]), float(data["temp"])
+                )
+
+            # Rain condition (rainSafe: 1=dry, 0=rain)
+            if "rainSafe" in data:
+                updates["rain_condition"] = "Dry" if data["rainSafe"] == "1" else "Rain"
+            elif "rain" in data:
+                updates["rain_condition"] = classify_rain_condition(int(float(data["rain"])))
+
+            # Light/day condition (lightSafe: 1=dark, 0=light)
+            if "lightSafe" in data:
+                updates["day_condition"] = "Dark" if data["lightSafe"] == "1" else "Light"
+            elif "lightmpsas" in data:
+                mpsas = float(data["lightmpsas"])
+                if mpsas > 18:
+                    updates["day_condition"] = "Dark"
+                elif mpsas > 10:
+                    updates["day_condition"] = "Light"
+                else:
+                    updates["day_condition"] = "VeryLight"
+
+            # Wind condition (windSafe: 1=calm, 0=windy)
+            if "windSafe" in data:
+                updates["wind_condition"] = "Calm" if data["windSafe"] == "1" else "Windy"
+            elif "wind" in data:
+                updates["wind_condition"] = classify_wind_condition(float(data["wind"]))
+
+            if updates:
+                logger.info(f"Cloudwatcher CGI: {updates}")
+                data_store.update(**updates)
+
+        except requests.RequestException as e:
+            logger.error(f"Cloudwatcher CGI request error: {e}")
+        except Exception as e:
+            logger.error(f"Cloudwatcher CGI error: {e}")
+
+        time.sleep(interval)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# BOM SATELLITE IMAGE FETCHER
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# BOM Satellite Products to fetch (from /anon/gen/gms/)
+BOM_SATELLITE_PRODUCTS = [
+    {"id": "IDE00135", "prefix": "IDE00135", "suffix": ".jpg"},       # Australia True Color
+    {"id": "IDE00135-RADAR", "prefix": "IDE00135.radar", "suffix": ".jpg"},  # Radar Composite
+    {"id": "IDE00005", "prefix": "IDE00005", "suffix": ".gif"},       # Visible B&W
+    {"id": "IDE00006", "prefix": "IDE00006", "suffix": ".gif"},       # Infrared B&W
+    {"id": "IDE00153", "prefix": "IDE00153", "suffix": ".jpg"},       # Hemisphere Full Disk
+]
+
+BOM_SATELLITE_FTP = "ftp://ftp.bom.gov.au/anon/gen/gms"
+
+# BOM Radar Products (from /anon/gen/radar/)
+# Radar station codes: https://www.bom.gov.au/australia/radar/
+# Range suffixes: 1=512km, 2=256km, 3=128km, 4=64km, I=doppler wind
+# Common stations: 71=Sydney, 66=Brisbane, 02=Melbourne, 70=Perth, 64=Adelaide
+BOM_RADAR_FTP = "ftp://ftp.bom.gov.au/anon/gen/radar"
+
+
+def get_radar_products():
+    """Build radar products list based on configured station."""
+    station = CONFIG.get("bom_radar_station", "")
+    if not station:
+        return []
+
+    # Return animated GIF loops for each range (these include background map)
+    return [
+        {"id": f"IDR{station}4", "code": f"IDR{station}4", "name": f"Radar {station} 64km"},
+        {"id": f"IDR{station}3", "code": f"IDR{station}3", "name": f"Radar {station} 128km"},
+        {"id": f"IDR{station}2", "code": f"IDR{station}2", "name": f"Radar {station} 256km"},
+        {"id": f"IDR{station}1", "code": f"IDR{station}1", "name": f"Radar {station} 512km"},
+    ]
+
+
+def get_bom_timestamp(minutes_ago: int = 30) -> str:
+    """Generate BOM timestamp string (YYYYMMDDHHmm) rounded to 10 minutes."""
+    now = datetime.utcnow()
+    target = now - timedelta(minutes=minutes_ago)
+    # Round down to nearest 10 minutes
+    target = target.replace(minute=(target.minute // 10) * 10, second=0, microsecond=0)
+    return target.strftime("%Y%m%d%H%M")
+
+
+def fetch_bom_satellite(product: dict) -> Optional[bytes]:
+    """Fetch a BOM satellite image via FTP with fallback timestamps using curl."""
+    import subprocess
+
+    # Try several timestamps going back up to 2 hours
+    for minutes_ago in range(30, 150, 10):
+        timestamp = get_bom_timestamp(minutes_ago)
+        url = f"{BOM_SATELLITE_FTP}/{product['prefix']}.{timestamp}{product['suffix']}"
+
+        try:
+            result = subprocess.run(
+                ["curl", "-s", "--connect-timeout", "10", "-o", "-", url],
+                capture_output=True,
+                timeout=30
+            )
+            if result.returncode == 0 and len(result.stdout) > 1000:
+                logger.debug(f"BOM {product['id']}: fetched from {timestamp}")
+                return result.stdout
+        except Exception:
+            continue
+
+    logger.warning(f"BOM {product['id']}: no image available")
+    return None
+
+
+def fetch_bom_radar(product: dict) -> Optional[bytes]:
+    """Fetch a BOM radar animated GIF loop via FTP using curl."""
+    import subprocess
+
+    # Radar GIFs are pre-generated loops named simply as {code}.gif
+    url = f"{BOM_RADAR_FTP}/{product['code']}.gif"
+
+    try:
+        result = subprocess.run(
+            ["curl", "-s", "--connect-timeout", "10", "-o", "-", url],
+            capture_output=True,
+            timeout=30
+        )
+        if result.returncode == 0 and len(result.stdout) > 1000:
+            logger.debug(f"BOM {product['id']}: fetched radar loop")
+            return result.stdout
+    except Exception as e:
+        logger.warning(f"BOM {product['id']}: fetch error - {e}")
+
+    logger.warning(f"BOM {product['id']}: no radar image available")
+    return None
+
+
+def push_bom_imagery():
+    """Fetch BOM satellite and radar images and push to remote API."""
+    api_url = CONFIG["remote_api"]
+    api_key = CONFIG["api_key"]
+    interval = CONFIG.get("bom_satellite_interval", 600)  # Default 10 minutes
+
+    if not api_key:
+        logger.warning("No API key, BOM imagery push disabled")
+        return
+
+    if not CONFIG.get("bom_satellite_enabled", True):
+        logger.info("BOM imagery fetching disabled")
+        return
+
+    radar_products = get_radar_products()
+    logger.info(f"Starting BOM imagery fetcher, interval={interval}s")
+    logger.info(f"  Satellite products: {len(BOM_SATELLITE_PRODUCTS)}")
+    logger.info(f"  Radar products: {len(radar_products)} (station: {CONFIG.get('bom_radar_station', 'none')})")
+
+    while True:
+        # Fetch satellite images
+        for product in BOM_SATELLITE_PRODUCTS:
+            try:
+                image_data = fetch_bom_satellite(product)
+
+                if image_data:
+                    files = {
+                        "image": (f"{product['id']}.jpg", image_data, "image/jpeg")
+                    }
+                    response = requests.post(
+                        f"{api_url}/satellite",
+                        files=files,
+                        data={"product_id": product["id"]},
+                        headers={"Authorization": f"Bearer {api_key}"},
+                        timeout=60,
+                    )
+
+                    if response.ok:
+                        logger.info(f"BOM {product['id']}: pushed successfully")
+                    else:
+                        logger.warning(f"BOM {product['id']}: push failed {response.status_code}")
+
+            except Exception as e:
+                logger.error(f"BOM {product['id']}: error - {e}")
+
+            time.sleep(2)
+
+        # Fetch radar images
+        for product in radar_products:
+            try:
+                image_data = fetch_bom_radar(product)
+
+                if image_data:
+                    files = {
+                        "image": (f"{product['id']}.gif", image_data, "image/gif")
+                    }
+                    response = requests.post(
+                        f"{api_url}/satellite",
+                        files=files,
+                        data={"product_id": product["id"]},
+                        headers={"Authorization": f"Bearer {api_key}"},
+                        timeout=60,
+                    )
+
+                    if response.ok:
+                        logger.info(f"BOM {product['id']}: pushed successfully")
+                    else:
+                        logger.warning(f"BOM {product['id']}: push failed {response.status_code}")
+
+            except Exception as e:
+                logger.error(f"BOM {product['id']}: error - {e}")
+
+            time.sleep(2)
+
+        time.sleep(interval)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -401,10 +771,13 @@ def main():
 
     mqtt_client = start_mqtt()
 
+    # Cloudwatcher via MQTT + CGI fallback; SQM via TCP; WeatherLink via HTTP
     threads = [
-        threading.Thread(target=read_cloudwatcher, daemon=True, name="cloudwatcher"),
         threading.Thread(target=read_sqm, daemon=True, name="sqm"),
+        threading.Thread(target=read_weatherlink, daemon=True, name="weatherlink"),
+        threading.Thread(target=read_cloudwatcher_cgi, daemon=True, name="cloudwatcher-cgi"),
         threading.Thread(target=push_data, daemon=True, name="pusher"),
+        threading.Thread(target=push_bom_imagery, daemon=True, name="bom-imagery"),
     ]
 
     for t in threads:

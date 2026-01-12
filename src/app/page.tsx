@@ -8,6 +8,9 @@ import {
   WeatherStat,
   SQMGauge,
   SQMGraph,
+  SatellitePanel,
+  AstronomyPanel,
+  ObservatoryInfo,
 } from "@/components";
 import {
   getCloudIcon,
@@ -95,16 +98,10 @@ export default function Dashboard() {
           </div>
         </section>
 
-        {/* Satellite Image */}
-        <section className={styles.panel}>
-          <h2 className={styles.panelTitle}>BOM Satellite</h2>
-          <div className={styles.imageContainer}>
-            <img
-              src={siteConfig.bomSatelliteUrl}
-              alt="Bureau of Meteorology satellite"
-              className={styles.image}
-            />
-          </div>
+        {/* BOM Satellite Imagery */}
+        <section className={`${styles.panel} ${styles.satellitePanel}`}>
+          <h2 className={styles.panelTitle}>BOM Satellite Imagery</h2>
+          <SatellitePanel />
         </section>
 
         {/* Clear Outside Forecast */}
@@ -265,6 +262,18 @@ export default function Dashboard() {
               />
             </div>
           )}
+        </section>
+
+        {/* Astronomy - Sun/Moon Data */}
+        <section className={styles.panel}>
+          <h2 className={styles.panelTitle}>Astronomy</h2>
+          <AstronomyPanel />
+        </section>
+
+        {/* Observatory Info */}
+        <section className={styles.panel}>
+          <h2 className={styles.panelTitle}>Observatory</h2>
+          <ObservatoryInfo />
         </section>
       </main>
 

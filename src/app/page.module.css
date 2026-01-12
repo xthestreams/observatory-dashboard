@@ -189,6 +189,11 @@
   }
 }
 
+/* Satellite */
+.satellitePanel {
+  grid-column: 1 / -1;
+}
+
 /* Weather */
 .weatherPanel {
   grid-column: span 2;
