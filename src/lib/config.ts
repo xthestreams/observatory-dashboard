@@ -13,6 +13,11 @@ export const siteConfig = {
   siteName: "My Observatory",
   siteSubtitle: "Site Meteo & Telemetry",
 
+  // Observatory logo URL (optional)
+  // Can be a path to an image in /public (e.g., "/logo.png")
+  // or an external URL. Set to null to show default telescope icon.
+  logoUrl: null as string | null,
+
   // Minor Planet Center (MPC) observatory code(s)
   // Find your code at: https://minorplanetcenter.net/iau/lists/ObsCodesF.html
   // Can be a single code or array for multiple telescopes/locations

@@ -69,7 +69,17 @@ export default function Dashboard() {
       {/* Header */}
       <header className={styles.header}>
         <div className={styles.logo}>
-          <span className={styles.logoIcon}>🔭</span>
+          {siteConfig.logoUrl ? (
+            <img
+              src={siteConfig.logoUrl}
+              alt={`${siteConfig.siteName} logo`}
+              className={styles.logoImage}
+            />
+          ) : (
+            <div className={styles.logoPlaceholder}>
+              <span className={styles.logoIcon}>🔭</span>
+            </div>
+          )}
           <div className={styles.logoText}>
             <h1>{siteConfig.siteName}</h1>
             <p>{siteConfig.siteSubtitle}</p>
@@ -83,44 +93,6 @@ export default function Dashboard() {
       </header>
 
       <main className={styles.mainGrid}>
-        {/* AllSky Camera */}
-        <section className={styles.panel}>
-          <h2 className={styles.panelTitle}>All-Sky Camera</h2>
-          <div className={styles.imageContainer}>
-            <img
-              src={allskyUrl}
-              alt="All-sky view"
-              className={styles.image}
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = "none";
-              }}
-            />
-          </div>
-        </section>
-
-        {/* BOM Satellite Imagery */}
-        <section className={`${styles.panel} ${styles.satellitePanel}`}>
-          <h2 className={styles.panelTitle}>BOM Satellite Imagery</h2>
-          <SatellitePanel />
-        </section>
-
-        {/* Clear Outside Forecast */}
-        <section className={styles.panel}>
-          <h2 className={styles.panelTitle}>Forecast</h2>
-          <a
-            href={`https://clearoutside.com/forecast/${siteConfig.latitude}/${siteConfig.longitude}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.forecastLink}
-          >
-            <img
-              src={`https://clearoutside.com/forecast_image_medium/${siteConfig.latitude}/${siteConfig.longitude}/forecast.png`}
-              alt="Clear Outside forecast"
-              className={styles.forecastImage}
-            />
-          </a>
-        </section>
-
         {/* SQM Panel */}
         <section className={styles.panel}>
           <h2 className={styles.panelTitle}>Sky Quality</h2>
@@ -208,6 +180,50 @@ export default function Dashboard() {
           </div>
         </section>
 
+        {/* Astronomy - Sun/Moon Data */}
+        <section className={styles.panel}>
+          <h2 className={styles.panelTitle}>Astronomy</h2>
+          <AstronomyPanel />
+        </section>
+
+        {/* Observatory Info */}
+        <section className={styles.panel}>
+          <h2 className={styles.panelTitle}>Observatory</h2>
+          <ObservatoryInfo />
+        </section>
+
+        {/* AllSky Camera */}
+        <section className={styles.panel}>
+          <h2 className={styles.panelTitle}>All-Sky Camera</h2>
+          <div className={styles.imageContainer}>
+            <img
+              src={allskyUrl}
+              alt="All-sky view"
+              className={styles.image}
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = "none";
+              }}
+            />
+          </div>
+        </section>
+
+        {/* Clear Outside Forecast */}
+        <section className={styles.panel}>
+          <h2 className={styles.panelTitle}>Forecast</h2>
+          <a
+            href={`https://clearoutside.com/forecast/${siteConfig.latitude}/${siteConfig.longitude}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={styles.forecastLink}
+          >
+            <img
+              src={`https://clearoutside.com/forecast_image_medium/${siteConfig.latitude}/${siteConfig.longitude}/forecast.png`}
+              alt="Clear Outside forecast"
+              className={styles.forecastImage}
+            />
+          </a>
+        </section>
+
         {/* Weather Station */}
         <section className={`${styles.panel} ${styles.weatherPanel}`}>
           <h2 className={styles.panelTitle}>Weather Station</h2>
@@ -264,16 +280,10 @@ export default function Dashboard() {
           )}
         </section>
 
-        {/* Astronomy - Sun/Moon Data */}
-        <section className={styles.panel}>
-          <h2 className={styles.panelTitle}>Astronomy</h2>
-          <AstronomyPanel />
-        </section>
-
-        {/* Observatory Info */}
-        <section className={styles.panel}>
-          <h2 className={styles.panelTitle}>Observatory</h2>
-          <ObservatoryInfo />
+        {/* BOM Satellite Imagery */}
+        <section className={`${styles.panel} ${styles.satellitePanel}`}>
+          <h2 className={styles.panelTitle}>BOM Satellite Imagery</h2>
+          <SatellitePanel />
         </section>
       </main>
 
