@@ -184,6 +184,36 @@
   margin-top: 0.5rem;
 }
 
+/* Clickable elements */
+.clickable {
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+
+.clickable:hover {
+  background: rgba(30, 58, 95, 0.5);
+}
+
+.clickable:active {
+  transform: scale(0.98);
+}
+
+.clickable:focus-visible {
+  outline: 2px solid rgba(96, 165, 250, 0.5);
+  outline-offset: 2px;
+}
+
+.instrumentBadge {
+  display: inline-block;
+  margin-top: 0.5rem;
+  padding: 0.2rem 0.5rem;
+  background: rgba(96, 165, 250, 0.2);
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: #60a5fa;
+}
+
 /* Conditions */
 .conditionsPanel {
   grid-column: span 1;
@@ -198,7 +228,7 @@
 .conditionsGrid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 1rem;
+  gap: 0.5rem;
 }
 
 @media (max-width: 600px) {

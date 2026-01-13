@@ -2,7 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { siteConfig } from "@/lib/config";
-import { WeatherData, HistoricalReading, ApiResponse } from "@/types/weather";
+import {
+  WeatherData,
+  HistoricalReading,
+  ApiResponse,
+  InstrumentReading,
+  FailedInstrument,
+  MetricName,
+} from "@/types/weather";
 import {
   ConditionIndicator,
   WeatherStat,
@@ -12,6 +19,8 @@ import {
   AstronomyPanel,
   ObservatoryInfo,
 } from "@/components";
+import InstrumentAlert from "@/components/InstrumentAlert";
+import InstrumentDetailModal from "@/components/InstrumentDetailModal";
 import {
   getCloudIcon,
   getWindIcon,
@@ -22,14 +31,22 @@ import {
   getTempCondition,
   getWindDirection,
 } from "@/lib/weatherHelpers";
+import { getInstrumentsForMetric, countInstrumentsForMetric } from "@/lib/instruments";
 import styles from "./page.module.css";
 
 export default function Dashboard() {
   const [data, setData] = useState<WeatherData | null>(null);
   const [sqmHistory, setSqmHistory] = useState<HistoricalReading[]>([]);
+  const [sqmHistoryByInstrument, setSqmHistoryByInstrument] = useState<Record<string, HistoricalReading[]>>({});
   const [allskyUrl, setAllskyUrl] = useState<string>("/api/allsky/latest.jpg");
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Multi-instrument state
+  const [instrumentReadings, setInstrumentReadings] = useState<Record<string, InstrumentReading>>({});
+  const [failedInstruments, setFailedInstruments] = useState<FailedInstrument[]>([]);
+  const [selectedMetric, setSelectedMetric] = useState<MetricName | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -44,6 +61,9 @@ export default function Dashboard() {
         const json: ApiResponse = await res.json();
         setData(json.current);
         setSqmHistory(json.sqmHistory || []);
+        setSqmHistoryByInstrument(json.sqmHistoryByInstrument || {});
+        setInstrumentReadings(json.instrumentReadings || {});
+        setFailedInstruments(json.failedInstruments || []);
         setLastUpdate(new Date());
       }
     } catch (err) {
@@ -54,6 +74,43 @@ export default function Dashboard() {
     // Bust cache on allsky image
     setAllskyUrl(`/api/allsky/latest.jpg?t=${Date.now()}`);
   }
+
+  const handleMetricClick = (metric: MetricName) => {
+    setSelectedMetric(metric);
+    setIsDetailModalOpen(true);
+  };
+
+  const handleInstrumentAlertClick = (code: string) => {
+    // Find what metric this instrument measures and show that detail
+    const reading = instrumentReadings[code];
+    if (reading) {
+      // Find the first metric this instrument has
+      const metrics: MetricName[] = [
+        "temperature", "humidity", "pressure", "sky_quality",
+        "wind_speed", "cloud_condition"
+      ];
+      for (const m of metrics) {
+        if (reading[m as keyof InstrumentReading] !== undefined) {
+          handleMetricClick(m);
+          return;
+        }
+      }
+    }
+  };
+
+  const getInstrumentsForCurrentMetric = () => {
+    if (!selectedMetric) return [];
+    return getInstrumentsForMetric(instrumentReadings, selectedMetric);
+  };
+
+  const getInstrumentCount = (metric: string) => {
+    return countInstrumentsForMetric(instrumentReadings, metric);
+  };
+
+  const getSiteAverageForMetric = (metric: MetricName): number | string | null => {
+    if (!data) return null;
+    return data[metric as keyof WeatherData] as number | string | null;
+  };
 
   if (isLoading) {
     return (
@@ -92,12 +149,28 @@ export default function Dashboard() {
         )}
       </header>
 
+      {/* Instrument Alert Banner */}
+      <InstrumentAlert
+        failedInstruments={failedInstruments}
+        onInstrumentClick={handleInstrumentAlertClick}
+      />
+
       <main className={styles.mainGrid}>
         {/* SQM Panel */}
         <section className={styles.panel}>
           <h2 className={styles.panelTitle}>Sky Quality</h2>
           <div className={styles.sqmContent}>
-            <div className={styles.sqmCurrent}>
+            <div
+              className={`${styles.sqmCurrent} ${styles.clickable}`}
+              onClick={() => handleMetricClick("sky_quality")}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  handleMetricClick("sky_quality");
+                }
+              }}
+            >
               <div className={styles.sqmValue}>
                 {data?.sky_quality?.toFixed(2) ?? "--"}
               </div>
@@ -107,9 +180,14 @@ export default function Dashboard() {
                   Sensor: {data.sqm_temperature.toFixed(1)}°C
                 </div>
               )}
+              {getInstrumentCount("sky_quality") > 1 && (
+                <div className={styles.instrumentBadge}>
+                  {getInstrumentCount("sky_quality")} SQMs
+                </div>
+              )}
             </div>
             <SQMGauge value={data?.sky_quality ?? null} />
-            <SQMGraph history={sqmHistory} />
+            <SQMGraph history={sqmHistory} historyByInstrument={sqmHistoryByInstrument} />
           </div>
         </section>
 
@@ -127,6 +205,7 @@ export default function Dashboard() {
                   ? `Δ ${(data.sky_temp - data.ambient_temp).toFixed(1)}°C`
                   : undefined
               }
+              onClick={() => handleMetricClick("cloud_condition")}
             />
             <ConditionIndicator
               label="Wind"
@@ -138,12 +217,14 @@ export default function Dashboard() {
                   ? `${data.wind_speed.toFixed(1)} km/h`
                   : undefined
               }
+              onClick={() => handleMetricClick("wind_condition")}
             />
             <ConditionIndicator
               label="Rain"
               condition={data?.rain_condition ?? "Unknown"}
               icon={getRainIcon(data?.rain_condition)}
               color={getConditionColor(data?.rain_condition, "rain")}
+              onClick={() => handleMetricClick("rain_condition")}
             />
             <ConditionIndicator
               label="Humidity"
@@ -156,12 +237,14 @@ export default function Dashboard() {
               detail={
                 data?.humidity ? `${data.humidity.toFixed(0)}%` : undefined
               }
+              onClick={() => handleMetricClick("humidity")}
             />
             <ConditionIndicator
               label="Daylight"
               condition={data?.day_condition ?? "Unknown"}
               icon={getDayIcon(data?.day_condition)}
               color={getConditionColor(data?.day_condition, "day")}
+              onClick={() => handleMetricClick("day_condition")}
             />
             <ConditionIndicator
               label="Temperature"
@@ -176,6 +259,7 @@ export default function Dashboard() {
                   ? `${data.temperature.toFixed(1)}°C`
                   : undefined
               }
+              onClick={() => handleMetricClick("temperature")}
             />
           </div>
         </section>
@@ -240,24 +324,32 @@ export default function Dashboard() {
                 value={data?.temperature}
                 unit="°C"
                 precision={1}
+                onClick={() => handleMetricClick("temperature")}
+                instrumentCount={getInstrumentCount("temperature")}
               />
               <WeatherStat
                 label="Humidity"
                 value={data?.humidity}
                 unit="%"
                 precision={0}
+                onClick={() => handleMetricClick("humidity")}
+                instrumentCount={getInstrumentCount("humidity")}
               />
               <WeatherStat
                 label="Pressure"
                 value={data?.pressure}
                 unit="hPa"
                 precision={1}
+                onClick={() => handleMetricClick("pressure")}
+                instrumentCount={getInstrumentCount("pressure")}
               />
               <WeatherStat
                 label="Dewpoint"
                 value={data?.dewpoint}
                 unit="°C"
                 precision={1}
+                onClick={() => handleMetricClick("dewpoint")}
+                instrumentCount={getInstrumentCount("dewpoint")}
               />
               <WeatherStat
                 label="Wind"
@@ -269,12 +361,16 @@ export default function Dashboard() {
                     ? ` @ ${getWindDirection(data.wind_direction)}`
                     : ""
                 }
+                onClick={() => handleMetricClick("wind_speed")}
+                instrumentCount={getInstrumentCount("wind_speed")}
               />
               <WeatherStat
                 label="Gust"
                 value={data?.wind_gust}
                 unit="km/h"
                 precision={1}
+                onClick={() => handleMetricClick("wind_gust")}
+                instrumentCount={getInstrumentCount("wind_gust")}
               />
             </div>
           )}
@@ -292,6 +388,15 @@ export default function Dashboard() {
           © {new Date().getFullYear()} {siteConfig.siteName}
         </p>
       </footer>
+
+      {/* Instrument Detail Modal */}
+      <InstrumentDetailModal
+        isOpen={isDetailModalOpen}
+        onClose={() => setIsDetailModalOpen(false)}
+        metric={selectedMetric}
+        instruments={getInstrumentsForCurrentMetric()}
+        siteAverage={selectedMetric ? getSiteAverageForMetric(selectedMetric) : null}
+      />
     </div>
   );
 }

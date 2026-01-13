@@ -50,7 +50,7 @@ export const siteConfig = {
   // Or specify manually: 71=Sydney, 66=Brisbane, 02=Melbourne, 70=Perth, 64=Adelaide
   // Set to empty string "" to disable radar imagery
   // Find stations at: https://www.bom.gov.au/australia/radar/
-  bomRadarStation: "71",
+  bomRadarStation: "69",
 
   // Bureau of Meteorology satellite image (legacy - now using SatellitePanel)
   bomSatelliteUrl: "http://www.bom.gov.au/gms/IDE00005.gif",

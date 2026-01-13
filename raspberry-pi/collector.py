@@ -9,6 +9,11 @@ Collects data from:
 
 Pushes to remote Vercel/Supabase API
 
+Multi-instrument support:
+- Each data source can be configured with its own instrument_code
+- Data is tagged with instrument_code for server-side aggregation
+- Unknown instrument_codes are auto-registered on the server
+
 Setup:
     pip install -r requirements.txt
     cp .env.example .env
@@ -58,6 +63,12 @@ CONFIG = {
     "bom_satellite_interval": int(os.getenv("BOM_SATELLITE_INTERVAL", "600")),
     "bom_radar_station": os.getenv("BOM_RADAR_STATION", ""),  # e.g., "71" for Sydney
     "log_level": os.getenv("LOG_LEVEL", "INFO"),
+    # Multi-instrument codes
+    "instrument_code_sqm": os.getenv("INSTRUMENT_CODE_SQM", "sqm-primary"),
+    "instrument_code_weatherlink": os.getenv("INSTRUMENT_CODE_WEATHERLINK", "wx-weatherlink"),
+    "instrument_code_cloudwatcher": os.getenv("INSTRUMENT_CODE_CLOUDWATCHER", "cw-solo"),
+    "instrument_code_mqtt_weather": os.getenv("INSTRUMENT_CODE_MQTT_WEATHER", "wx-mqtt"),
+    "instrument_code_allsky": os.getenv("INSTRUMENT_CODE_ALLSKY", "allsky-main"),
 }
 
 # Logging setup
@@ -69,47 +80,71 @@ logger = logging.getLogger("observatory-collector")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# DATA STORE
+# MULTI-INSTRUMENT DATA STORE
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class ThreadSafeDataStore:
-    """Thread-safe store for the latest sensor readings."""
+class MultiInstrumentDataStore:
+    """Thread-safe store for multiple instrument readings."""
 
     def __init__(self):
-        self._data: Dict[str, Any] = {
-            "timestamp": None,
-            "temperature": None,
-            "humidity": None,
-            "pressure": None,
-            "dewpoint": None,
-            "wind_speed": None,
-            "wind_gust": None,
-            "wind_direction": None,
-            "rain_rate": None,
-            "cloud_condition": "Unknown",
-            "rain_condition": "Unknown",
-            "wind_condition": "Unknown",
-            "day_condition": "Unknown",
-            "sky_temp": None,
-            "ambient_temp": None,
-            "sky_quality": None,
-            "sqm_temperature": None,
-            "lora_sensors": {},
-        }
+        self._instruments: Dict[str, Dict[str, Any]] = {}
         self._lock = threading.Lock()
 
-    def update(self, **kwargs) -> None:
+    def update(self, instrument_code: str, **kwargs) -> None:
+        """Update readings for a specific instrument."""
         with self._lock:
-            self._data.update(kwargs)
-            self._data["timestamp"] = datetime.utcnow().isoformat()
+            if instrument_code not in self._instruments:
+                self._instruments[instrument_code] = {}
+            self._instruments[instrument_code].update(kwargs)
+            self._instruments[instrument_code]["timestamp"] = datetime.utcnow().isoformat()
 
-    def get_all(self) -> Dict[str, Any]:
+    def get(self, instrument_code: str) -> Dict[str, Any]:
+        """Get readings for a specific instrument."""
         with self._lock:
-            return self._data.copy()
+            return self._instruments.get(instrument_code, {}).copy()
+
+    def get_all(self) -> Dict[str, Dict[str, Any]]:
+        """Get all instrument readings."""
+        with self._lock:
+            return {k: v.copy() for k, v in self._instruments.items()}
+
+    def get_combined(self) -> Dict[str, Any]:
+        """Get combined readings from all instruments (legacy format)."""
+        with self._lock:
+            combined = {
+                "timestamp": None,
+                "temperature": None,
+                "humidity": None,
+                "pressure": None,
+                "dewpoint": None,
+                "wind_speed": None,
+                "wind_gust": None,
+                "wind_direction": None,
+                "rain_rate": None,
+                "cloud_condition": "Unknown",
+                "rain_condition": "Unknown",
+                "wind_condition": "Unknown",
+                "day_condition": "Unknown",
+                "sky_temp": None,
+                "ambient_temp": None,
+                "sky_quality": None,
+                "sqm_temperature": None,
+                "lora_sensors": {},
+            }
+
+            # Merge all instrument data (later values overwrite earlier)
+            for instrument_data in self._instruments.values():
+                for key, value in instrument_data.items():
+                    if key == "lora_sensors" and isinstance(value, dict):
+                        combined["lora_sensors"].update(value)
+                    elif value is not None and key in combined:
+                        combined[key] = value
+
+            return combined
 
 
 # Global data store
-data_store = ThreadSafeDataStore()
+data_store = MultiInstrumentDataStore()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -135,6 +170,7 @@ def on_mqtt_message(client, userdata, msg):
         logger.debug(f"MQTT: {topic} -> {payload}")
 
         if "weewx" in topic or "weather" in topic:
+            instrument_code = CONFIG["instrument_code_mqtt_weather"]
             updates = {}
             field_map = {
                 "outTemp": "temperature",
@@ -157,26 +193,25 @@ def on_mqtt_message(client, userdata, msg):
                     updates[our_field] = value
 
             if updates:
-                data_store.update(**updates)
+                data_store.update(instrument_code, **updates)
 
         elif "lora" in topic:
+            # LoRa sensors are stored under the MQTT weather instrument
             sensor_id = payload.get("id", topic.split("/")[-1])
-            current = data_store.get_all()
+            current = data_store.get(CONFIG["instrument_code_mqtt_weather"])
             lora_sensors = current.get("lora_sensors", {})
             lora_sensors[sensor_id] = {
                 **payload,
                 "last_update": datetime.utcnow().isoformat(),
             }
-            data_store.update(lora_sensors=lora_sensors)
+            data_store.update(CONFIG["instrument_code_mqtt_weather"], lora_sensors=lora_sensors)
 
         elif "cloudwatcher" in topic or "aag" in topic:
-            # AAG Cloudwatcher MQTT data
-            # Format: clouds=sky_temp, temp=ambient_temp, rain=sensor_value,
-            #         cloudsSafe/rainSafe/lightSafe/windSafe = "Safe"/"Unsafe"
+            instrument_code = CONFIG["instrument_code_cloudwatcher"]
             updates = {}
 
             # Sky and ambient temperature
-            sky_temp = payload.get("clouds")  # "clouds" is actually sky temperature
+            sky_temp = payload.get("clouds")
             ambient_temp = payload.get("temp")
 
             if sky_temp is not None:
@@ -184,7 +219,7 @@ def on_mqtt_message(client, userdata, msg):
             if ambient_temp is not None:
                 updates["ambient_temp"] = float(ambient_temp)
 
-            # Cloud condition from cloudsSafe or calculate from temps
+            # Cloud condition
             clouds_safe = payload.get("cloudsSafe", "")
             if clouds_safe:
                 if clouds_safe == "Safe":
@@ -198,23 +233,16 @@ def on_mqtt_message(client, userdata, msg):
             rain_safe = payload.get("rainSafe", "")
             rain_val = payload.get("rain")
             if rain_safe:
-                if rain_safe == "Safe":
-                    updates["rain_condition"] = "Dry"
-                else:
-                    updates["rain_condition"] = "Rain"
+                updates["rain_condition"] = "Dry" if rain_safe == "Safe" else "Rain"
             elif rain_val is not None:
                 updates["rain_condition"] = classify_rain_condition(int(rain_val))
 
-            # Light/day condition from lightmpsas (mag per square arcsec)
+            # Light/day condition
             light_safe = payload.get("lightSafe", "")
             light_mpsas = payload.get("lightmpsas")
             if light_safe:
-                if light_safe == "Safe":
-                    updates["day_condition"] = "Dark"
-                else:
-                    updates["day_condition"] = "Light"
+                updates["day_condition"] = "Dark" if light_safe == "Safe" else "Light"
             elif light_mpsas is not None:
-                # Higher mpsas = darker sky
                 if light_mpsas > 18:
                     updates["day_condition"] = "Dark"
                 elif light_mpsas > 10:
@@ -226,16 +254,13 @@ def on_mqtt_message(client, userdata, msg):
             wind_safe = payload.get("windSafe", "")
             wind_val = payload.get("wind")
             if wind_safe:
-                if wind_safe == "Safe":
-                    updates["wind_condition"] = "Calm"
-                else:
-                    updates["wind_condition"] = "Windy"
+                updates["wind_condition"] = "Calm" if wind_safe == "Safe" else "Windy"
             elif wind_val is not None:
                 updates["wind_condition"] = classify_wind_condition(float(wind_val))
 
             if updates:
-                logger.info(f"Cloudwatcher MQTT: {updates}")
-                data_store.update(**updates)
+                logger.info(f"Cloudwatcher MQTT [{instrument_code}]: {updates}")
+                data_store.update(instrument_code, **updates)
 
     except json.JSONDecodeError:
         logger.warning(f"Invalid JSON on topic {msg.topic}")
@@ -301,18 +326,19 @@ def classify_day_condition(light_sensor: int) -> str:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# SQM READER (Cloudwatcher data comes via MQTT)
+# SQM READER
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def read_sqm():
     host = CONFIG["sqm_host"]
     port = CONFIG["sqm_port"]
+    instrument_code = CONFIG["instrument_code_sqm"]
 
     if not host:
         logger.warning("SQM host not configured, skipping")
         return
 
-    logger.info(f"Starting SQM-LE reader on {host}:{port}")
+    logger.info(f"Starting SQM-LE reader [{instrument_code}] on {host}:{port}")
 
     while True:
         try:
@@ -347,10 +373,11 @@ def read_sqm():
                                     sqm_temp = float(temp_str.replace("C", "").strip())
 
                             data_store.update(
+                                instrument_code,
                                 sky_quality=sqm_value,
                                 sqm_temperature=sqm_temp,
                             )
-                            logger.debug(f"SQM: {sqm_value} mag/arcsec², temp={sqm_temp}°C")
+                            logger.debug(f"SQM [{instrument_code}]: {sqm_value} mag/arcsec², temp={sqm_temp}°C")
 
                     time.sleep(60)
 
@@ -380,13 +407,14 @@ def read_weatherlink():
     """Read weather data from WeatherLink Live local API."""
     host = CONFIG["weatherlink_host"]
     interval = CONFIG["weatherlink_interval"]
+    instrument_code = CONFIG["instrument_code_weatherlink"]
 
     if not host:
         logger.warning("WeatherLink host not configured, skipping")
         return
 
     url = f"http://{host}/v1/current_conditions"
-    logger.info(f"Starting WeatherLink Live reader at {url}")
+    logger.info(f"Starting WeatherLink Live reader [{instrument_code}] at {url}")
 
     while True:
         try:
@@ -431,8 +459,8 @@ def read_weatherlink():
                         updates["pressure"] = round(inches_to_hpa(condition["bar_sea_level"]), 1)
 
             if updates:
-                logger.info(f"WeatherLink: {updates}")
-                data_store.update(**updates)
+                logger.info(f"WeatherLink [{instrument_code}]: {updates}")
+                data_store.update(instrument_code, **updates)
 
         except requests.RequestException as e:
             logger.error(f"WeatherLink request error: {e}")
@@ -450,13 +478,14 @@ def read_cloudwatcher_cgi():
     """Read weather data from AAG Cloudwatcher CGI interface."""
     host = CONFIG["cloudwatcher_host"]
     interval = CONFIG["cloudwatcher_interval"]
+    instrument_code = CONFIG["instrument_code_cloudwatcher"]
 
     if not host:
         logger.warning("Cloudwatcher CGI host not configured, skipping")
         return
 
     url = f"http://{host}/cgi-bin/cgiLastData"
-    logger.info(f"Starting Cloudwatcher CGI reader at {url}")
+    logger.info(f"Starting Cloudwatcher CGI reader [{instrument_code}] at {url}")
 
     while True:
         try:
@@ -511,8 +540,8 @@ def read_cloudwatcher_cgi():
                 updates["wind_condition"] = classify_wind_condition(float(data["wind"]))
 
             if updates:
-                logger.info(f"Cloudwatcher CGI: {updates}")
-                data_store.update(**updates)
+                logger.info(f"Cloudwatcher CGI [{instrument_code}]: {updates}")
+                data_store.update(instrument_code, **updates)
 
         except requests.RequestException as e:
             logger.error(f"Cloudwatcher CGI request error: {e}")
@@ -538,9 +567,6 @@ BOM_SATELLITE_PRODUCTS = [
 BOM_SATELLITE_FTP = "ftp://ftp.bom.gov.au/anon/gen/gms"
 
 # BOM Radar Products (from /anon/gen/radar/)
-# Radar station codes: https://www.bom.gov.au/australia/radar/
-# Range suffixes: 1=512km, 2=256km, 3=128km, 4=64km, I=doppler wind
-# Common stations: 71=Sydney, 66=Brisbane, 02=Melbourne, 70=Perth, 64=Adelaide
 BOM_RADAR_FTP = "ftp://ftp.bom.gov.au/anon/gen/radar"
 
 
@@ -550,7 +576,6 @@ def get_radar_products():
     if not station:
         return []
 
-    # Return animated GIF loops for each range (these include background map)
     return [
         {"id": f"IDR{station}4", "code": f"IDR{station}4", "name": f"Radar {station} 64km"},
         {"id": f"IDR{station}3", "code": f"IDR{station}3", "name": f"Radar {station} 128km"},
@@ -563,7 +588,6 @@ def get_bom_timestamp(minutes_ago: int = 30) -> str:
     """Generate BOM timestamp string (YYYYMMDDHHmm) rounded to 10 minutes."""
     now = datetime.utcnow()
     target = now - timedelta(minutes=minutes_ago)
-    # Round down to nearest 10 minutes
     target = target.replace(minute=(target.minute // 10) * 10, second=0, microsecond=0)
     return target.strftime("%Y%m%d%H%M")
 
@@ -572,7 +596,6 @@ def fetch_bom_satellite(product: dict) -> Optional[bytes]:
     """Fetch a BOM satellite image via FTP with fallback timestamps using curl."""
     import subprocess
 
-    # Try several timestamps going back up to 2 hours
     for minutes_ago in range(30, 150, 10):
         timestamp = get_bom_timestamp(minutes_ago)
         url = f"{BOM_SATELLITE_FTP}/{product['prefix']}.{timestamp}{product['suffix']}"
@@ -597,7 +620,6 @@ def fetch_bom_radar(product: dict) -> Optional[bytes]:
     """Fetch a BOM radar animated GIF loop via FTP using curl."""
     import subprocess
 
-    # Radar GIFs are pre-generated loops named simply as {code}.gif
     url = f"{BOM_RADAR_FTP}/{product['code']}.gif"
 
     try:
@@ -620,7 +642,7 @@ def push_bom_imagery():
     """Fetch BOM satellite and radar images and push to remote API."""
     api_url = CONFIG["remote_api"]
     api_key = CONFIG["api_key"]
-    interval = CONFIG.get("bom_satellite_interval", 600)  # Default 10 minutes
+    interval = CONFIG.get("bom_satellite_interval", 600)
 
     if not api_key:
         logger.warning("No API key, BOM imagery push disabled")
@@ -736,6 +758,7 @@ def fetch_allsky_image() -> Optional[bytes]:
 
 
 def push_data():
+    """Push data for all instruments."""
     api_url = CONFIG["remote_api"]
     api_key = CONFIG["api_key"]
 
@@ -756,21 +779,32 @@ def push_data():
 
     while True:
         try:
-            data = data_store.get_all()
+            # Push data for each instrument separately
+            all_data = data_store.get_all()
 
-            response = requests.post(
-                f"{api_url}/data",
-                json=data,
-                headers=headers,
-                timeout=30,
-            )
+            for instrument_code, data in all_data.items():
+                if not data.get("timestamp"):
+                    continue  # Skip instruments with no data
 
-            if response.ok:
-                logger.info(f"Data pushed successfully at {datetime.now()}")
-            else:
-                logger.warning(f"Data push failed: {response.status_code} - {response.text}")
+                # Add instrument_code to payload
+                payload = {
+                    "instrument_code": instrument_code,
+                    **{k: v for k, v in data.items() if k != "timestamp"}
+                }
 
-            # Push AllSky image (from file or URL)
+                response = requests.post(
+                    f"{api_url}/data",
+                    json=payload,
+                    headers=headers,
+                    timeout=30,
+                )
+
+                if response.ok:
+                    logger.info(f"Pushed {instrument_code} data at {datetime.now()}")
+                else:
+                    logger.warning(f"Push failed for {instrument_code}: {response.status_code} - {response.text}")
+
+            # Push AllSky image
             image_data = fetch_allsky_image()
             if image_data:
                 files = {"image": ("allsky.jpg", image_data, "image/jpeg")}
@@ -799,15 +833,19 @@ def push_data():
 
 def main():
     logger.info("=" * 60)
-    logger.info("Observatory Data Collector Starting")
+    logger.info("Observatory Data Collector Starting (Multi-Instrument)")
     logger.info("=" * 60)
     logger.info(f"Remote API: {CONFIG['remote_api']}")
     logger.info(f"MQTT Broker: {CONFIG['mqtt_broker']}:{CONFIG['mqtt_port']}")
     logger.info(f"Push Interval: {CONFIG['push_interval']}s")
+    logger.info(f"Instrument Codes:")
+    logger.info(f"  SQM: {CONFIG['instrument_code_sqm']}")
+    logger.info(f"  WeatherLink: {CONFIG['instrument_code_weatherlink']}")
+    logger.info(f"  Cloudwatcher: {CONFIG['instrument_code_cloudwatcher']}")
+    logger.info(f"  MQTT Weather: {CONFIG['instrument_code_mqtt_weather']}")
 
     mqtt_client = start_mqtt()
 
-    # Cloudwatcher via MQTT + CGI fallback; SQM via TCP; WeatherLink via HTTP
     threads = [
         threading.Thread(target=read_sqm, daemon=True, name="sqm"),
         threading.Thread(target=read_weatherlink, daemon=True, name="weatherlink"),
@@ -823,12 +861,10 @@ def main():
     try:
         while True:
             time.sleep(300)
-            data = data_store.get_all()
-            logger.info(
-                f"Status: temp={data.get('temperature')}°C, "
-                f"sqm={data.get('sky_quality')}, "
-                f"cloud={data.get('cloud_condition')}"
-            )
+            all_data = data_store.get_all()
+            logger.info(f"Status: {len(all_data)} instruments active")
+            for code, data in all_data.items():
+                logger.info(f"  {code}: {list(data.keys())}")
     except KeyboardInterrupt:
         logger.info("Shutting down...")
         if mqtt_client:

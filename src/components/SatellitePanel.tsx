@@ -12,20 +12,7 @@ interface BomProduct {
 }
 
 // BOM Satellite Image Products
-// Each has a unique ID for easy reference when removing
 const SATELLITE_PRODUCTS: BomProduct[] = [
-  {
-    id: "IDE00135",
-    name: "Australia True Color",
-    description: "Full Australia - natural colors with terrain visible",
-    category: "satellite",
-  },
-  {
-    id: "IDE00135-RADAR",
-    name: "Australia Radar Composite",
-    description: "Full Australia with colored rain/precipitation overlay",
-    category: "satellite",
-  },
   {
     id: "IDE00005",
     name: "Australia Visible (B&W)",
@@ -38,12 +25,6 @@ const SATELLITE_PRODUCTS: BomProduct[] = [
     description: "Full Australia - infrared, shows cloud heights, works at night",
     category: "satellite",
   },
-  {
-    id: "IDE00153",
-    name: "Hemisphere Full Disk",
-    description: "Full hemisphere view with colored rain indicators",
-    category: "satellite",
-  },
 ];
 
 // Generate radar products based on configured or auto-selected station
@@ -54,24 +35,6 @@ function getRadarProducts(stationCode: string): BomProduct[] {
   const stationName = stationInfo?.name || `Station ${stationCode}`;
 
   return [
-    {
-      id: `IDR${stationCode}4`,
-      name: `Radar 64km`,
-      description: `Local weather radar - 64km range from ${stationName}`,
-      category: "radar" as const,
-    },
-    {
-      id: `IDR${stationCode}3`,
-      name: `Radar 128km`,
-      description: `Regional weather radar - 128km range from ${stationName}`,
-      category: "radar" as const,
-    },
-    {
-      id: `IDR${stationCode}2`,
-      name: `Radar 256km`,
-      description: `Wide area weather radar - 256km range from ${stationName}`,
-      category: "radar" as const,
-    },
     {
       id: `IDR${stationCode}1`,
       name: `Radar 512km`,

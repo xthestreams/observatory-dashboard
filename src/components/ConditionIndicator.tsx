@@ -6,6 +6,7 @@ interface ConditionIndicatorProps {
   icon: string;
   color: string;
   detail?: string;
+  onClick?: () => void;
 }
 
 export function ConditionIndicator({
@@ -14,9 +15,26 @@ export function ConditionIndicator({
   icon,
   color,
   detail,
+  onClick,
 }: ConditionIndicatorProps) {
+  const isClickable = !!onClick;
+
   return (
-    <div className={styles.indicator}>
+    <div
+      className={`${styles.indicator} ${isClickable ? styles.clickable : ""}`}
+      onClick={onClick}
+      role={isClickable ? "button" : undefined}
+      tabIndex={isClickable ? 0 : undefined}
+      onKeyDown={
+        isClickable
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                onClick?.();
+              }
+            }
+          : undefined
+      }
+    >
       <div className={styles.icon}>{icon}</div>
       <div className={styles.label}>{label}</div>
       <div className={styles.status} style={{ color }}>

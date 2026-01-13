@@ -1,0 +1,217 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+  animation: fadeIn 0.15s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.modal {
+  background: var(--card-bg, #1a1a2e);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+  animation: slideUp 0.2s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary, #fff);
+}
+
+.close {
+  background: none;
+  border: none;
+  padding: 0.5rem;
+  cursor: pointer;
+  color: var(--text-secondary, #aaa);
+  font-size: 1.25rem;
+  line-height: 1;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+}
+
+.close:hover {
+  opacity: 1;
+}
+
+.content {
+  padding: 1.25rem;
+  overflow-y: auto;
+}
+
+.siteAverage {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.averageLabel {
+  font-size: 0.875rem;
+  color: var(--text-secondary, #aaa);
+}
+
+.averageValue {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-primary, #60a5fa);
+}
+
+.divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 1rem 0;
+}
+
+.instrumentList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.instrumentRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+
+.instrumentRow:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.instrumentRow.excluded {
+  opacity: 0.6;
+}
+
+.instrumentInfo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.statusIcon {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.instrumentDetails {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.instrumentName {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary, #fff);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.instrumentMeta {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #888);
+}
+
+.valueSection {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.value {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--text-primary, #fff);
+  font-variant-numeric: tabular-nums;
+}
+
+.excludedValue {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.excludedBadge {
+  font-size: 0.625rem;
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  text-transform: uppercase;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.empty {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-secondary, #888);
+  font-size: 0.875rem;
+}
+
+.legend {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  padding-top: 1rem;
+  margin-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary, #888);
+}

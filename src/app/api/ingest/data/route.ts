@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase";
+import { getOrCreateInstrument } from "@/lib/instruments";
+import { IngestPayload } from "@/types/weather";
 
 export async function POST(request: NextRequest) {
   // Verify API key from Raspberry Pi
@@ -12,7 +14,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const supabase = createServiceClient();
-    const data = await request.json();
+    const data: IngestPayload = await request.json();
     const timestamp = new Date().toISOString();
 
     // Validate payload
@@ -20,8 +22,51 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
 
-    // Prepare the record
-    const record = {
+    // Get instrument code (default if not provided for backward compatibility)
+    const instrumentCode = data.instrument_code || "default";
+
+    // Get or create the instrument (auto-registration)
+    const instrumentId = await getOrCreateInstrument(supabase, instrumentCode, data);
+
+    // Prepare the reading record
+    const readingRecord = {
+      instrument_id: instrumentId,
+      temperature: data.temperature ?? null,
+      humidity: data.humidity ?? null,
+      pressure: data.pressure ?? null,
+      dewpoint: data.dewpoint ?? null,
+      wind_speed: data.wind_speed ?? null,
+      wind_gust: data.wind_gust ?? null,
+      wind_direction: data.wind_direction ?? null,
+      rain_rate: data.rain_rate ?? null,
+      cloud_condition: data.cloud_condition ?? null,
+      rain_condition: data.rain_condition ?? null,
+      wind_condition: data.wind_condition ?? null,
+      day_condition: data.day_condition ?? null,
+      sky_temp: data.sky_temp ?? null,
+      ambient_temp: data.ambient_temp ?? null,
+      sky_quality: data.sky_quality ?? null,
+      sqm_temperature: data.sqm_temperature ?? null,
+      is_outlier: false, // Will be updated by trigger/function if needed
+      created_at: timestamp,
+    };
+
+    // Insert into instrument_readings (new multi-instrument table)
+    const { error: readingError } = await supabase
+      .from("instrument_readings")
+      .insert(readingRecord);
+
+    if (readingError) {
+      console.error("Error inserting instrument reading:", readingError);
+      return NextResponse.json(
+        { error: "Failed to insert instrument reading" },
+        { status: 500 }
+      );
+    }
+
+    // BACKWARD COMPATIBILITY: Also update legacy tables
+    // This allows gradual migration and easy rollback
+    const legacyRecord = {
       temperature: data.temperature ?? null,
       humidity: data.humidity ?? null,
       pressure: data.pressure ?? null,
@@ -42,29 +87,31 @@ export async function POST(request: NextRequest) {
       updated_at: timestamp,
     };
 
-    // Update current conditions (upsert)
+    // Update current conditions (upsert) - legacy table
     const { error: currentError } = await supabase
       .from("current_conditions")
-      .upsert({ id: 1, ...record });
+      .upsert({ id: 1, ...legacyRecord });
 
     if (currentError) {
       console.error("Error updating current conditions:", currentError);
-      return NextResponse.json(
-        { error: "Failed to update current conditions" },
-        { status: 500 }
-      );
+      // Don't fail the request - new table is the source of truth
     }
 
-    // Also insert into historical readings
+    // Also insert into historical readings - legacy table
     const { error: historyError } = await supabase
       .from("weather_readings")
-      .insert({ ...record, created_at: timestamp });
+      .insert({ ...legacyRecord, created_at: timestamp });
 
     if (historyError) {
       console.error("Error inserting historical reading:", historyError);
+      // Don't fail the request - new table is the source of truth
     }
 
-    return NextResponse.json({ success: true, timestamp });
+    return NextResponse.json({
+      success: true,
+      timestamp,
+      instrument: instrumentCode,
+    });
   } catch (error) {
     console.error("Ingest error:", error);
     return NextResponse.json(

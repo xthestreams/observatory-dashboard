@@ -2,38 +2,56 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 1rem;
+  padding: 0.35rem 0.25rem;
   background: rgba(30, 58, 95, 0.2);
-  border-radius: 8px;
+  border-radius: 4px;
   border: 1px solid rgba(96, 165, 250, 0.1);
-  transition: all 0.3s ease;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
 }
 
 .indicator:hover {
   background: rgba(30, 58, 95, 0.3);
-  transform: translateY(-2px);
+}
+
+.indicator.clickable {
+  cursor: pointer;
+}
+
+.indicator.clickable:hover {
+  background: rgba(30, 58, 95, 0.4);
+  border-color: rgba(96, 165, 250, 0.25);
+}
+
+.indicator.clickable:active {
+  transform: scale(0.98);
+}
+
+.indicator.clickable:focus-visible {
+  outline: 2px solid rgba(96, 165, 250, 0.5);
+  outline-offset: 2px;
 }
 
 .icon {
-  font-size: 2rem;
-  margin-bottom: 0.5rem;
+  font-size: 1rem;
+  line-height: 1;
 }
 
 .label {
-  font-size: 0.75rem;
+  font-size: 0.6rem;
   color: #888;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.03em;
+  margin-top: 0.15rem;
 }
 
 .status {
-  font-size: 1rem;
+  font-size: 0.75rem;
   font-weight: 600;
-  margin-top: 0.25rem;
+  line-height: 1.2;
 }
 
 .detail {
-  font-size: 0.8rem;
+  font-size: 0.65rem;
   color: #aaa;
-  margin-top: 0.25rem;
+  line-height: 1;
 }
