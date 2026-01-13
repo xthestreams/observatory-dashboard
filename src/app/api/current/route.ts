@@ -4,7 +4,7 @@ import {
   fetchFailedInstruments,
   fetchLatestInstrumentReadings,
 } from "@/lib/instruments";
-import { WeatherData, HistoricalReading, ApiResponse } from "@/types/weather";
+import { WeatherData, HistoricalReading, ApiResponse, CloudCondition, RainCondition, WindCondition, DayCondition } from "@/types/weather";
 
 export async function GET() {
   try {
@@ -69,10 +69,10 @@ export async function GET() {
         wind_gust: Math.max(...readings.map(r => r.wind_gust ?? 0)) || null,
         wind_direction: parseInt(mode(readings.map(r => r.wind_direction?.toString() ?? null)) || "0") || null,
         rain_rate: avg(readings.map(r => r.rain_rate)),
-        cloud_condition: cloud_condition || "Unknown",
-        rain_condition: mode(readings.map(r => r.rain_condition)) || "Unknown",
-        wind_condition: mode(readings.map(r => r.wind_condition)) || "Unknown",
-        day_condition: mode(readings.map(r => r.day_condition)) || "Unknown",
+        cloud_condition: (cloud_condition || "Unknown") as CloudCondition,
+        rain_condition: (mode(readings.map(r => r.rain_condition)) || "Unknown") as RainCondition,
+        wind_condition: (mode(readings.map(r => r.wind_condition)) || "Unknown") as WindCondition,
+        day_condition: (mode(readings.map(r => r.day_condition)) || "Unknown") as DayCondition,
         sky_temp: avg(readings.map(r => r.sky_temp)) !== null ? Math.round(avg(readings.map(r => r.sky_temp))! * 10) / 10 : null,
         ambient_temp: avg(readings.map(r => r.ambient_temp)) !== null ? Math.round(avg(readings.map(r => r.ambient_temp))! * 10) / 10 : null,
         sky_quality: sky_quality !== null ? Math.round(sky_quality * 100) / 100 : null,
