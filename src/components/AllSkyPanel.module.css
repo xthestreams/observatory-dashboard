@@ -80,3 +80,12 @@
 .toggleButton.active svg {
   fill: currentColor;
 }
+
+.loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.875rem;
+}

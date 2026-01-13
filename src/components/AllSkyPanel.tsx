@@ -58,6 +58,7 @@ export default function AllSkyPanel({ imageUrl }: AllSkyPanelProps) {
   const [showOverlay, setShowOverlay] = useState(false);
   const [config, setConfig] = useState<VirtualSkyConfig>(DEFAULT_CONFIG);
   const [scriptsLoaded, setScriptsLoaded] = useState(false);
+  const [scriptsLoading, setScriptsLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const vsRef = useRef<unknown>(null);
 
@@ -77,15 +78,17 @@ export default function AllSkyPanel({ imageUrl }: AllSkyPanelProps) {
     loadConfig();
   }, []);
 
-  // Load jQuery and VirtualSky scripts dynamically
+  // Load jQuery and VirtualSky scripts when overlay is enabled
   useEffect(() => {
-    if (scriptsLoaded) return;
+    if (!showOverlay || scriptsLoaded || scriptsLoading) return;
 
     // Check if already loaded
     if (typeof window !== "undefined" && window.$ && "virtualsky" in window.$) {
       setScriptsLoaded(true);
       return;
     }
+
+    setScriptsLoading(true);
 
     // Load jQuery first, then VirtualSky
     const loadScripts = async () => {
@@ -112,12 +115,16 @@ export default function AllSkyPanel({ imageUrl }: AllSkyPanelProps) {
       });
 
       setScriptsLoaded(true);
+      setScriptsLoading(false);
     };
 
-    loadScripts().catch((err) => console.error(err));
-  }, [scriptsLoaded]);
+    loadScripts().catch((err) => {
+      console.error(err);
+      setScriptsLoading(false);
+    });
+  }, [showOverlay, scriptsLoaded, scriptsLoading]);
 
-  // Initialize or update VirtualSky when overlay is shown
+  // Initialize or update VirtualSky when overlay is shown and scripts are loaded
   useEffect(() => {
     if (!showOverlay || !scriptsLoaded || !containerRef.current) return;
 
@@ -184,7 +191,7 @@ export default function AllSkyPanel({ imageUrl }: AllSkyPanelProps) {
             (e.target as HTMLImageElement).style.display = "none";
           }}
         />
-        {showOverlay && scriptsLoaded && (
+        {showOverlay && (
           <div
             ref={containerRef}
             id="virtualsky-overlay"
@@ -193,7 +200,11 @@ export default function AllSkyPanel({ imageUrl }: AllSkyPanelProps) {
               opacity: config.opacity,
               transform: `scale(${config.scaleX}, ${config.scaleY})`,
             }}
-          />
+          >
+            {scriptsLoading && (
+              <div className={styles.loading}>Loading stars...</div>
+            )}
+          </div>
         )}
       </div>
       <button
