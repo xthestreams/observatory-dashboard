@@ -139,6 +139,29 @@ $$ LANGUAGE plpgsql;
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- SITE CONFIGURATION TABLE
+-- Key-value store for dashboard settings (VirtualSky config, etc.)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS site_config (
+    key TEXT PRIMARY KEY,
+    value JSONB NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Enable RLS
+ALTER TABLE site_config ENABLE ROW LEVEL SECURITY;
+
+-- Allow public read access
+CREATE POLICY "Allow public read" ON site_config
+    FOR SELECT USING (true);
+
+-- Allow service role full access
+CREATE POLICY "Allow service write" ON site_config
+    FOR ALL USING (true) WITH CHECK (true);
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- STORAGE BUCKET FOR IMAGES
 -- Run this in Storage section or via SQL
 -- ─────────────────────────────────────────────────────────────────────────────

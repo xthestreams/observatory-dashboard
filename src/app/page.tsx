@@ -21,6 +21,7 @@ import {
 import InstrumentAlert from "@/components/InstrumentAlert";
 import InstrumentDetailModal from "@/components/InstrumentDetailModal";
 import ForecastPanel from "@/components/ForecastPanel";
+import AllSkyPanel from "@/components/AllSkyPanel";
 import {
   getCloudIcon,
   getWindIcon,
@@ -205,19 +206,10 @@ export default function Dashboard() {
           </div>
         </section>
 
-        {/* AllSky Camera */}
+        {/* AllSky Camera with VirtualSky overlay */}
         <section className={styles.panel}>
           <h2 className={styles.panelTitle}>All-Sky Camera</h2>
-          <div className={styles.imageContainer}>
-            <img
-              src={allskyUrl}
-              alt="All-sky view"
-              className={styles.image}
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = "none";
-              }}
-            />
-          </div>
+          <AllSkyPanel imageUrl={allskyUrl} />
         </section>
 
         {/* Row 2: Sky Conditions, BOM Radar, BOM Satellite Visible, BOM Satellite Infrared */}

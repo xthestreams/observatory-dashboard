@@ -1,0 +1,320 @@
+/* Login */
+.loginContainer {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-background, #0a0a0f);
+  padding: 1rem;
+}
+
+.loginForm {
+  max-width: 400px;
+  width: 100%;
+  padding: 2rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+}
+
+.loginForm h1 {
+  margin: 0 0 0.5rem;
+  font-size: 1.5rem;
+  color: var(--color-text, #fff);
+}
+
+.loginForm p {
+  margin: 0 0 1.5rem;
+  color: var(--color-text-secondary, #888);
+  font-size: 0.9rem;
+}
+
+.input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: var(--color-text, #fff);
+  font-size: 1rem;
+  margin-bottom: 1rem;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--color-primary, #60a5fa);
+}
+
+.button {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: var(--color-primary, #60a5fa);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.button:hover {
+  background: #3b82f6;
+}
+
+.error {
+  color: var(--color-error, #ef4444);
+  font-size: 0.875rem;
+  margin: -0.5rem 0 1rem;
+}
+
+/* Main layout */
+.container {
+  min-height: 100vh;
+  background: var(--color-background, #0a0a0f);
+  color: var(--color-text, #fff);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 2rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.backLink {
+  color: var(--color-primary, #60a5fa);
+  text-decoration: none;
+  font-size: 0.875rem;
+}
+
+.backLink:hover {
+  text-decoration: underline;
+}
+
+.main {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.section {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+.section h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.25rem;
+}
+
+.description {
+  color: var(--color-text-secondary, #888);
+  font-size: 0.9rem;
+  margin: 0 0 1.5rem;
+}
+
+/* Form */
+.formGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.formGroup > label:first-child {
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.slider {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  appearance: none;
+  cursor: pointer;
+}
+
+.slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: var(--color-primary, #60a5fa);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.sliderValue {
+  font-size: 0.875rem;
+  color: var(--color-primary, #60a5fa);
+  font-weight: 500;
+}
+
+.select {
+  padding: 0.5rem 0.75rem;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: var(--color-text, #fff);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.select:focus {
+  outline: none;
+  border-color: var(--color-primary, #60a5fa);
+}
+
+.checkboxGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.5rem;
+}
+
+.checkboxGrid label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary, #ccc);
+  cursor: pointer;
+}
+
+.checkboxGrid label:hover {
+  color: var(--color-text, #fff);
+}
+
+.checkboxGrid input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-primary, #60a5fa);
+}
+
+.hint {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary, #666);
+  margin: 0;
+}
+
+/* Actions */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.previewButton {
+  padding: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: var(--color-text, #fff);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.previewButton:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.saveButton {
+  padding: 0.5rem 1.5rem;
+  background: var(--color-primary, #60a5fa);
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.saveButton:hover:not(:disabled) {
+  background: #3b82f6;
+}
+
+.saveButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.successMsg {
+  color: var(--color-success, #22c55e);
+  font-size: 0.875rem;
+}
+
+.errorMsg {
+  color: var(--color-error, #ef4444);
+  font-size: 0.875rem;
+}
+
+/* Preview */
+.preview {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.preview h3 {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+}
+
+.previewCanvas {
+  width: 400px;
+  height: 400px;
+  max-width: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .header {
+    flex-direction: column;
+    gap: 0.5rem;
+    text-align: center;
+  }
+
+  .main {
+    padding: 1rem;
+  }
+
+  .section {
+    padding: 1rem;
+  }
+
+  .checkboxGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .previewCanvas {
+    width: 100%;
+    height: 300px;
+  }
+}
