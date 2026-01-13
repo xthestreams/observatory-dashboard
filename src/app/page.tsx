@@ -124,32 +124,6 @@ export default function Dashboard() {
 
   return (
     <div className={styles.dashboard}>
-      {/* Header */}
-      <header className={styles.header}>
-        <div className={styles.logo}>
-          {siteConfig.logoUrl ? (
-            <img
-              src={siteConfig.logoUrl}
-              alt={`${siteConfig.siteName} logo`}
-              className={styles.logoImage}
-            />
-          ) : (
-            <div className={styles.logoPlaceholder}>
-              <span className={styles.logoIcon}>🔭</span>
-            </div>
-          )}
-          <div className={styles.logoText}>
-            <h1>{siteConfig.siteName}</h1>
-            <p>{siteConfig.siteSubtitle}</p>
-          </div>
-        </div>
-        {lastUpdate && (
-          <div className={styles.lastUpdate}>
-            Last update: {lastUpdate.toLocaleTimeString()}
-          </div>
-        )}
-      </header>
-
       {/* Instrument Alert Banner */}
       <InstrumentAlert
         failedInstruments={failedInstruments}
@@ -159,9 +133,32 @@ export default function Dashboard() {
       <main className={styles.mainGrid}>
         {/* Row 1: Observatory, Astronomy, Sky Quality, AllSky Camera */}
 
-        {/* Observatory Info */}
+        {/* Observatory Info (with header content) */}
         <section className={styles.panel}>
-          <h2 className={styles.panelTitle}>Observatory</h2>
+          <div className={styles.observatoryHeader}>
+            <div className={styles.logo}>
+              {siteConfig.logoUrl ? (
+                <img
+                  src={siteConfig.logoUrl}
+                  alt={`${siteConfig.siteName} logo`}
+                  className={styles.logoImage}
+                />
+              ) : (
+                <div className={styles.logoPlaceholder}>
+                  <span className={styles.logoIcon}>🔭</span>
+                </div>
+              )}
+              <div className={styles.logoText}>
+                <h1>{siteConfig.siteName}</h1>
+                <p>{siteConfig.siteSubtitle}</p>
+              </div>
+            </div>
+            {lastUpdate && (
+              <div className={styles.lastUpdate}>
+                {lastUpdate.toLocaleTimeString()}
+              </div>
+            )}
+          </div>
           <ObservatoryInfo />
         </section>
 
