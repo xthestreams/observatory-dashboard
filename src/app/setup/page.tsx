@@ -17,6 +17,8 @@ interface VirtualSkyConfig {
   showMeridian: boolean;
   magnitude: number;
   opacity: number;
+  scaleX: number;
+  scaleY: number;
 }
 
 const DEFAULT_CONFIG: VirtualSkyConfig = {
@@ -32,6 +34,8 @@ const DEFAULT_CONFIG: VirtualSkyConfig = {
   showMeridian: false,
   magnitude: 5,
   opacity: 0.7,
+  scaleX: 1.0,
+  scaleY: 1.0,
 };
 
 export default function SetupPage() {
@@ -274,6 +278,42 @@ export default function SetupPage() {
                 className={styles.slider}
               />
               <span className={styles.sliderValue}>{(config.opacity * 100).toFixed(0)}%</span>
+            </div>
+
+            <div className={styles.formGroup}>
+              <label htmlFor="scaleX">Horizontal Scale</label>
+              <input
+                type="range"
+                id="scaleX"
+                min="0.5"
+                max="1.5"
+                step="0.05"
+                value={config.scaleX}
+                onChange={(e) => setConfig({ ...config, scaleX: Number(e.target.value) })}
+                className={styles.slider}
+              />
+              <span className={styles.sliderValue}>{(config.scaleX * 100).toFixed(0)}%</span>
+              <p className={styles.hint}>
+                Stretch or compress overlay horizontally to match camera FOV.
+              </p>
+            </div>
+
+            <div className={styles.formGroup}>
+              <label htmlFor="scaleY">Vertical Scale</label>
+              <input
+                type="range"
+                id="scaleY"
+                min="0.5"
+                max="1.5"
+                step="0.05"
+                value={config.scaleY}
+                onChange={(e) => setConfig({ ...config, scaleY: Number(e.target.value) })}
+                className={styles.slider}
+              />
+              <span className={styles.sliderValue}>{(config.scaleY * 100).toFixed(0)}%</span>
+              <p className={styles.hint}>
+                Stretch or compress overlay vertically to match camera FOV.
+              </p>
             </div>
 
             <div className={styles.formGroup}>

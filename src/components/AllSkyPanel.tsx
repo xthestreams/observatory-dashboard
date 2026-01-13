@@ -17,6 +17,8 @@ interface VirtualSkyConfig {
   showMeridian: boolean;
   magnitude: number;     // Star magnitude limit
   opacity: number;       // Overlay opacity (0-1)
+  scaleX: number;        // Horizontal scale (0.5-1.5)
+  scaleY: number;        // Vertical scale (0.5-1.5)
 }
 
 interface AllSkyPanelProps {
@@ -36,6 +38,8 @@ const DEFAULT_CONFIG: VirtualSkyConfig = {
   showMeridian: false,
   magnitude: 5,
   opacity: 0.7,
+  scaleX: 1.0,
+  scaleY: 1.0,
 };
 
 export default function AllSkyPanel({ imageUrl }: AllSkyPanelProps) {
@@ -155,7 +159,10 @@ export default function AllSkyPanel({ imageUrl }: AllSkyPanelProps) {
             ref={containerRef}
             id="virtualsky-overlay"
             className={styles.overlay}
-            style={{ opacity: config.opacity }}
+            style={{
+              opacity: config.opacity,
+              transform: `scale(${config.scaleX}, ${config.scaleY})`,
+            }}
           />
         )}
       </div>

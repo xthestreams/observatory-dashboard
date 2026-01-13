@@ -17,6 +17,8 @@ const DEFAULT_CONFIG = {
   showMeridian: false,
   magnitude: 5,
   opacity: 0.7,
+  scaleX: 1.0,
+  scaleY: 1.0,
 };
 
 // GET - Retrieve VirtualSky configuration
