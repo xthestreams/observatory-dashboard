@@ -55,12 +55,29 @@ export default function AllSkyPage() {
   const [scriptsLoaded, setScriptsLoaded] = useState(false);
   const [showOverlay, setShowOverlay] = useState(true);
   const [imageUrl, setImageUrl] = useState("/api/allsky/latest.jpg");
+  const [containerSize, setContainerSize] = useState(600);
   const containerRef = useRef<HTMLDivElement>(null);
+  const imageContainerRef = useRef<HTMLDivElement>(null);
   const vsRef = useRef<unknown>(null);
 
   // Add cache-busting timestamp to image URL
   useEffect(() => {
     setImageUrl(`/api/allsky/latest.jpg?t=${Date.now()}`);
+  }, []);
+
+  // Calculate container size based on viewport
+  useEffect(() => {
+    const updateSize = () => {
+      if (imageContainerRef.current) {
+        const rect = imageContainerRef.current.getBoundingClientRect();
+        const size = Math.min(rect.width, rect.height, 800);
+        setContainerSize(size);
+      }
+    };
+
+    updateSize();
+    window.addEventListener("resize", updateSize);
+    return () => window.removeEventListener("resize", updateSize);
   }, []);
 
   // Load VirtualSky config from API
@@ -121,7 +138,7 @@ export default function AllSkyPage() {
 
   // Initialize VirtualSky when scripts are loaded
   useEffect(() => {
-    if (!scriptsLoaded || !containerRef.current || !showOverlay) return;
+    if (!scriptsLoaded || !containerRef.current || !showOverlay || containerSize === 0) return;
 
     if (!window.$ || !window.$.virtualsky) {
       console.error("VirtualSky not available");
@@ -131,9 +148,11 @@ export default function AllSkyPage() {
     // Clear previous instance
     containerRef.current.innerHTML = "";
 
-    // Create VirtualSky instance using jQuery
+    // Create VirtualSky instance using jQuery with explicit dimensions
     vsRef.current = window.$.virtualsky({
       id: "virtualsky-container",
+      width: containerSize,
+      height: containerSize,
       latitude: siteConfig.latitude,
       longitude: siteConfig.longitude,
       az: config.azOffset,
@@ -171,7 +190,7 @@ export default function AllSkyPage() {
         meridian: "rgba(100,180,255,0.4)",
       },
     });
-  }, [scriptsLoaded, showOverlay, config]);
+  }, [scriptsLoaded, showOverlay, config, containerSize]);
 
   return (
     <div className={styles.container}>
@@ -191,7 +210,7 @@ export default function AllSkyPage() {
       </header>
 
       <main className={styles.main}>
-        <div className={styles.imageContainer}>
+        <div ref={imageContainerRef} className={styles.imageContainer}>
           <img
             src={imageUrl}
             alt="All-sky view"
@@ -203,6 +222,8 @@ export default function AllSkyPage() {
               id="virtualsky-container"
               className={styles.overlay}
               style={{
+                width: containerSize,
+                height: containerSize,
                 opacity: config.opacity,
                 transform: `scale(${config.scaleX}, ${config.scaleY})`,
               }}
