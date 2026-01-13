@@ -52,6 +52,7 @@ CONFIG = {
     "cloudwatcher_host": os.getenv("CLOUDWATCHER_HOST", ""),
     "cloudwatcher_interval": int(os.getenv("CLOUDWATCHER_INTERVAL", "30")),
     "allsky_image_path": os.getenv("ALLSKY_IMAGE_PATH", "/home/pi/allsky/tmp/image.jpg"),
+    "allsky_image_url": os.getenv("ALLSKY_IMAGE_URL", ""),  # Fallback URL if file not found
     "push_interval": int(os.getenv("PUSH_INTERVAL", "60")),
     "bom_satellite_enabled": os.getenv("BOM_SATELLITE_ENABLED", "true").lower() == "true",
     "bom_satellite_interval": int(os.getenv("BOM_SATELLITE_INTERVAL", "600")),
@@ -696,16 +697,57 @@ def push_bom_imagery():
 # DATA PUSHER
 # ═══════════════════════════════════════════════════════════════════════════════
 
+def fetch_allsky_image() -> Optional[bytes]:
+    """
+    Fetch AllSky image from local file path or URL fallback.
+    Returns image bytes or None if not available.
+    """
+    image_path = Path(CONFIG["allsky_image_path"]) if CONFIG["allsky_image_path"] else None
+    image_url = CONFIG["allsky_image_url"]
+
+    # Try local file first
+    if image_path and image_path.exists():
+        mtime = image_path.stat().st_mtime
+        age = time.time() - mtime
+
+        if age < 300:  # Image less than 5 minutes old
+            try:
+                with open(image_path, "rb") as f:
+                    logger.debug(f"AllSky: loaded from file (age: {age:.0f}s)")
+                    return f.read()
+            except Exception as e:
+                logger.warning(f"AllSky file read error: {e}")
+        else:
+            logger.debug(f"AllSky file too old ({age:.0f}s)")
+
+    # Fallback to URL if configured
+    if image_url:
+        try:
+            response = requests.get(image_url, timeout=30)
+            if response.ok and len(response.content) > 1000:
+                logger.debug(f"AllSky: loaded from URL")
+                return response.content
+            else:
+                logger.warning(f"AllSky URL returned invalid response: {response.status_code}")
+        except requests.RequestException as e:
+            logger.warning(f"AllSky URL fetch error: {e}")
+
+    return None
+
+
 def push_data():
     api_url = CONFIG["remote_api"]
     api_key = CONFIG["api_key"]
-    image_path = Path(CONFIG["allsky_image_path"])
 
     if not api_key:
         logger.error("No API key configured, data push disabled")
         return
 
     logger.info(f"Starting data pusher, interval={CONFIG['push_interval']}s")
+    if CONFIG["allsky_image_path"]:
+        logger.info(f"AllSky file path: {CONFIG['allsky_image_path']}")
+    if CONFIG["allsky_image_url"]:
+        logger.info(f"AllSky URL fallback: {CONFIG['allsky_image_url']}")
 
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -728,26 +770,20 @@ def push_data():
             else:
                 logger.warning(f"Data push failed: {response.status_code} - {response.text}")
 
-            # Push AllSky image
-            if image_path.exists():
-                mtime = image_path.stat().st_mtime
-                age = time.time() - mtime
-
-                if age < 300:
-                    with open(image_path, "rb") as f:
-                        files = {"image": ("allsky.jpg", f, "image/jpeg")}
-                        img_response = requests.post(
-                            f"{api_url}/image",
-                            files=files,
-                            headers={"Authorization": f"Bearer {api_key}"},
-                            timeout=60,
-                        )
-                        if img_response.ok:
-                            logger.debug("AllSky image pushed")
-                        else:
-                            logger.warning(f"Image push failed: {img_response.status_code}")
+            # Push AllSky image (from file or URL)
+            image_data = fetch_allsky_image()
+            if image_data:
+                files = {"image": ("allsky.jpg", image_data, "image/jpeg")}
+                img_response = requests.post(
+                    f"{api_url}/image",
+                    files=files,
+                    headers={"Authorization": f"Bearer {api_key}"},
+                    timeout=60,
+                )
+                if img_response.ok:
+                    logger.debug("AllSky image pushed")
                 else:
-                    logger.debug(f"AllSky image too old ({age:.0f}s), skipping")
+                    logger.warning(f"Image push failed: {img_response.status_code}")
 
         except requests.RequestException as e:
             logger.error(f"Push error: {e}")
