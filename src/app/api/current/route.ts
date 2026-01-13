@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createServerClient } from "@/lib/supabase";
+import { createServiceClient } from "@/lib/supabase";
 import {
   fetchFailedInstruments,
   fetchLatestInstrumentReadings,
@@ -8,36 +8,76 @@ import { WeatherData, HistoricalReading, ApiResponse } from "@/types/weather";
 
 export async function GET() {
   try {
-    const supabase = createServerClient();
+    const supabase = createServiceClient();
 
-    // Fetch site conditions from the new aggregated view
-    const { data: siteConditions, error: siteError } = await supabase
-      .from("site_conditions")
-      .select("*")
-      .single();
+    // Fetch latest readings for site conditions aggregation
+    // Using direct query instead of view due to potential schema cache issues
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
 
-    // Fallback to legacy current_conditions if site_conditions doesn't exist yet
+    const { data: latestReadings, error: readingsError } = await supabase
+      .from("instrument_readings")
+      .select(`
+        *,
+        instruments!inner(code, include_in_average, status)
+      `)
+      .gte("created_at", tenMinutesAgo)
+      .eq("is_outlier", false)
+      .eq("instruments.status", "active")
+      .eq("instruments.include_in_average", true)
+      .order("created_at", { ascending: false });
+
+    // Aggregate the readings into site conditions
     let current: WeatherData | null = null;
 
-    if (siteConditions && !siteError) {
+    if (latestReadings && latestReadings.length > 0 && !readingsError) {
+      // Get the latest reading per instrument
+      const latestByInstrument = new Map<string, typeof latestReadings[0]>();
+      for (const r of latestReadings) {
+        const code = r.instruments?.code;
+        if (code && !latestByInstrument.has(code)) {
+          latestByInstrument.set(code, r);
+        }
+      }
+
+      const readings = Array.from(latestByInstrument.values());
+
+      // Calculate averages
+      const avg = (arr: (number | null)[]) => {
+        const valid = arr.filter((x): x is number => x !== null);
+        return valid.length > 0 ? valid.reduce((a, b) => a + b, 0) / valid.length : null;
+      };
+      const mode = (arr: (string | null)[]) => {
+        const valid = arr.filter((x): x is string => x !== null);
+        if (valid.length === 0) return null;
+        const counts = valid.reduce((acc, v) => {
+          acc[v] = (acc[v] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+        return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+      };
+
+      const temperature = avg(readings.map(r => r.temperature));
+      const sky_quality = avg(readings.map(r => r.sky_quality));
+      const cloud_condition = mode(readings.map(r => r.cloud_condition));
+
       current = {
-        temperature: siteConditions.temperature,
-        humidity: siteConditions.humidity,
-        pressure: siteConditions.pressure,
-        dewpoint: siteConditions.dewpoint,
-        wind_speed: siteConditions.wind_speed,
-        wind_gust: siteConditions.wind_gust,
-        wind_direction: siteConditions.wind_direction,
-        rain_rate: siteConditions.rain_rate,
-        cloud_condition: siteConditions.cloud_condition || "Unknown",
-        rain_condition: siteConditions.rain_condition || "Unknown",
-        wind_condition: siteConditions.wind_condition || "Unknown",
-        day_condition: siteConditions.day_condition || "Unknown",
-        sky_temp: siteConditions.sky_temp,
-        ambient_temp: siteConditions.ambient_temp,
-        sky_quality: siteConditions.sky_quality,
-        sqm_temperature: siteConditions.sqm_temperature,
-        updated_at: siteConditions.updated_at || new Date().toISOString(),
+        temperature: temperature !== null ? Math.round(temperature * 10) / 10 : null,
+        humidity: avg(readings.map(r => r.humidity)) !== null ? Math.round(avg(readings.map(r => r.humidity))!) : null,
+        pressure: avg(readings.map(r => r.pressure)) !== null ? Math.round(avg(readings.map(r => r.pressure))! * 10) / 10 : null,
+        dewpoint: avg(readings.map(r => r.dewpoint)) !== null ? Math.round(avg(readings.map(r => r.dewpoint))! * 10) / 10 : null,
+        wind_speed: avg(readings.map(r => r.wind_speed)) !== null ? Math.round(avg(readings.map(r => r.wind_speed))! * 10) / 10 : null,
+        wind_gust: Math.max(...readings.map(r => r.wind_gust ?? 0)) || null,
+        wind_direction: parseInt(mode(readings.map(r => r.wind_direction?.toString() ?? null)) || "0") || null,
+        rain_rate: avg(readings.map(r => r.rain_rate)),
+        cloud_condition: cloud_condition || "Unknown",
+        rain_condition: mode(readings.map(r => r.rain_condition)) || "Unknown",
+        wind_condition: mode(readings.map(r => r.wind_condition)) || "Unknown",
+        day_condition: mode(readings.map(r => r.day_condition)) || "Unknown",
+        sky_temp: avg(readings.map(r => r.sky_temp)) !== null ? Math.round(avg(readings.map(r => r.sky_temp))! * 10) / 10 : null,
+        ambient_temp: avg(readings.map(r => r.ambient_temp)) !== null ? Math.round(avg(readings.map(r => r.ambient_temp))! * 10) / 10 : null,
+        sky_quality: sky_quality !== null ? Math.round(sky_quality * 100) / 100 : null,
+        sqm_temperature: avg(readings.map(r => r.sqm_temperature)) !== null ? Math.round(avg(readings.map(r => r.sqm_temperature))! * 10) / 10 : null,
+        updated_at: readings[0]?.created_at || new Date().toISOString(),
       };
     } else {
       // Fallback to legacy table

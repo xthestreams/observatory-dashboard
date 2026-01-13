@@ -179,20 +179,25 @@ export async function fetchLatestInstrumentReadings(
     .from("instruments")
     .select("*");
 
-  if (instError) throw instError;
+  if (instError) {
+    console.error("Error fetching instruments:", instError);
+    throw instError;
+  }
+
+  console.log("Found instruments:", instruments?.length || 0);
 
   const readings: Record<string, InstrumentReading> = {};
 
   // For each instrument, get its latest reading
   for (const inst of instruments || []) {
-    const { data: reading } = await supabase
+    const { data: readingArray } = await supabase
       .from("instrument_readings")
       .select("*")
       .eq("instrument_id", inst.id)
       .order("created_at", { ascending: false })
-      .limit(1)
-      .single();
+      .limit(1);
 
+    const reading = readingArray?.[0];
     if (reading) {
       readings[inst.code] = {
         instrumentId: inst.id,
