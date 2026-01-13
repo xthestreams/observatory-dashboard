@@ -20,6 +20,7 @@ import {
 } from "@/components";
 import InstrumentAlert from "@/components/InstrumentAlert";
 import InstrumentDetailModal from "@/components/InstrumentDetailModal";
+import ForecastPanel from "@/components/ForecastPanel";
 import {
   getCloudIcon,
   getWindIcon,
@@ -332,21 +333,13 @@ export default function Dashboard() {
 
         {/* Row 3: Forecast, Weather Station */}
 
-        {/* Clear Outside Forecast */}
+        {/* 5-Day Forecast */}
         <section className={styles.panel}>
-          <h2 className={styles.panelTitle}>Forecast</h2>
-          <a
-            href={`https://clearoutside.com/forecast/${siteConfig.latitude}/${siteConfig.longitude}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.forecastLink}
-          >
-            <img
-              src={`https://clearoutside.com/forecast_image_medium/${siteConfig.latitude}/${siteConfig.longitude}/forecast.png`}
-              alt="Clear Outside forecast"
-              className={styles.forecastImage}
-            />
-          </a>
+          <h2 className={styles.panelTitle}>5-Day Forecast</h2>
+          <ForecastPanel
+            latitude={siteConfig.latitude}
+            longitude={siteConfig.longitude}
+          />
         </section>
 
         {/* Weather Station */}
