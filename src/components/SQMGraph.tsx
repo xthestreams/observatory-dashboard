@@ -99,10 +99,15 @@ export function SQMGraph({ history, historyByInstrument }: SQMGraphProps) {
 
   const hasMultipleInstruments = instrumentCodes.length > 1;
 
-  // Calculate moon altitude for each data point
+  // Calculate moon altitude for each data point and format time in local timezone
   const historyWithMoon = useMemo(() => {
     return history.map(h => ({
       ...h,
+      // Format time in user's local timezone (browser-side)
+      time: new Date(h.timestamp).toLocaleTimeString("en-AU", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
       moon_altitude: calculateMoonAltitude(
         h.timestamp,
         siteConfig.latitude,

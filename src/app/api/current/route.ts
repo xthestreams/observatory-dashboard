@@ -145,10 +145,8 @@ export async function GET() {
       for (const reading of newSqmHistory) {
         const instrumentCode = instrumentMap.get(reading.instrument_id) || "unknown";
         const histReading: HistoricalReading = {
-          time: new Date(reading.created_at).toLocaleTimeString("en-AU", {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
+          // Don't format time on server - let client format in local timezone
+          time: "", // Will be formatted client-side
           timestamp: reading.created_at,
           sky_quality: reading.sky_quality,
           instrumentCode,
@@ -182,10 +180,8 @@ export async function GET() {
       sqmHistory = Array.from(windows.entries())
         .sort((a, b) => a[0] - b[0])
         .map(([, w]) => ({
-          time: new Date(w.timestamp).toLocaleTimeString("en-AU", {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
+          // Don't format time on server - let client format in local timezone
+          time: "", // Will be formatted client-side
           timestamp: w.timestamp,
           sky_quality: w.sum / w.count,
         }));
@@ -205,10 +201,8 @@ export async function GET() {
       if (legacyHistory && legacyHistory.length > 0) {
         sqmHistory = legacyHistory.map(
           (reading: { created_at: string; sky_quality: number }) => ({
-            time: new Date(reading.created_at).toLocaleTimeString("en-AU", {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
+            // Don't format time on server - let client format in local timezone
+            time: "", // Will be formatted client-side
             timestamp: reading.created_at,
             sky_quality: reading.sky_quality,
           })
