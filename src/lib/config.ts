@@ -10,7 +10,7 @@ export const siteConfig = {
   // ═══════════════════════════════════════════════════════════════════════════
 
   // Your observatory name
-  siteName: "My Observatory",
+  siteName: "SROF Observatory",
   siteSubtitle: "Site Meteo & Telemetry",
 
   // Observatory logo URL (optional)
@@ -22,7 +22,7 @@ export const siteConfig = {
   // Find your code at: https://minorplanetcenter.net/iau/lists/ObsCodesF.html
   // Can be a single code or array for multiple telescopes/locations
   // Set to empty array [] if not registered with MPC
-  mpcCodes: ["Q62"] as string[],
+  mpcCodes: ["E09"] as string[],
 
   // ═══════════════════════════════════════════════════════════════════════════
   // GEOGRAPHIC LOCATION
@@ -30,12 +30,12 @@ export const siteConfig = {
 
   // Observatory coordinates (decimal degrees)
   // Used for astronomy calculations, weather product selection, and forecasts
-  latitude: -31.2743,
+  latitude: -31.2773,
   longitude: 149.0698,
 
   // Altitude in meters above sea level
   // Used for atmospheric calculations and displayed (rounded) on dashboard
-  altitude: 1165,
+  altitude: 850,
 
   // Timezone offset from UTC (e.g., +11 for AEDT, +10 for AEST)
   // Used for sun/moon calculations
@@ -50,7 +50,7 @@ export const siteConfig = {
   // Or specify manually: 71=Sydney, 66=Brisbane, 02=Melbourne, 70=Perth, 64=Adelaide
   // Set to empty string "" to disable radar imagery
   // Find stations at: https://www.bom.gov.au/australia/radar/
-  bomRadarStation: "auto",
+  bomRadarStation: "71",
 
   // Bureau of Meteorology satellite image (legacy - now using SatellitePanel)
   bomSatelliteUrl: "http://www.bom.gov.au/gms/IDE00005.gif",
@@ -69,7 +69,7 @@ export const siteConfig = {
 
   // Privacy: round altitude to nearest N meters when displayed publicly
   // e.g., 1000 rounds 1165m to "~1000m"
-  altitudeRounding: 1000,
+  altitudeRounding: 100,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -154,7 +154,9 @@ export function getNearestRadarStation(): string {
 /**
  * Get radar station info by code
  */
-export function getRadarStationInfo(code: string): { code: string; name: string } | null {
+export function getRadarStationInfo(
+  code: string
+): { code: string; name: string } | null {
   const station = BOM_RADAR_STATIONS.find((s) => s.code === code);
   return station ? { code: station.code, name: station.name } : null;
 }
