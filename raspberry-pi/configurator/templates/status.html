@@ -1,0 +1,344 @@
+{% extends "base.html" %}
+
+{% block title %}Status - Observatory Configurator{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Status Dashboard</h1>
+    <p class="subtitle">Monitor your observatory data collector</p>
+</div>
+
+<!-- Service Status Card -->
+<div class="card">
+    <div class="card-header">
+        <h2>Collector Service</h2>
+        <div class="service-badge" id="service-badge">
+            <span class="status-dot {% if service.running %}status-green{% else %}status-red{% endif %}"></span>
+            <span id="service-status-text">{% if service.running %}Running{% else %}Stopped{% endif %}</span>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="service-controls">
+            <button class="btn btn-success" onclick="controlService('start')" {% if service.running %}disabled{% endif %}>
+                Start
+            </button>
+            <button class="btn btn-warning" onclick="controlService('restart')">
+                Restart
+            </button>
+            <button class="btn btn-danger" onclick="controlService('stop')" {% if not service.running %}disabled{% endif %}>
+                Stop
+            </button>
+        </div>
+        {% if service.uptime %}
+        <p class="service-uptime">Started: {{ service.uptime }}</p>
+        {% endif %}
+        {% if service.error %}
+        <p class="error-text">{{ service.error }}</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- API Connection Card -->
+<div class="card">
+    <div class="card-header">
+        <h2>API Connection</h2>
+        <span class="status-indicator" id="api-status">
+            <span class="status-dot status-gray"></span>
+            Not tested
+        </span>
+    </div>
+    <div class="card-body">
+        <div class="info-row">
+            <span class="label">URL:</span>
+            <span class="value">{{ config.REMOTE_API_URL }}</span>
+        </div>
+        <div class="info-row">
+            <span class="label">API Key:</span>
+            <span class="value">{{ masked_key }}</span>
+        </div>
+        <button class="btn btn-primary" onclick="testApiConnection()">Test Connection</button>
+        <div id="api-result" class="test-result"></div>
+    </div>
+</div>
+
+<!-- Instruments Grid -->
+<h2 class="section-title">Instruments</h2>
+<div class="instruments-grid">
+
+    <!-- SQM -->
+    <div class="instrument-card {% if config.SQM_HOST %}enabled{% else %}disabled{% endif %}">
+        <div class="instrument-header">
+            <h3>Sky Quality Meter</h3>
+            <span class="status-indicator" id="sqm-status">
+                <span class="status-dot {% if config.SQM_HOST %}status-gray{% else %}status-off{% endif %}"></span>
+                {% if config.SQM_HOST %}Not tested{% else %}Disabled{% endif %}
+            </span>
+        </div>
+        <div class="instrument-body">
+            {% if config.SQM_HOST %}
+            <div class="info-row">
+                <span class="label">Host:</span>
+                <span class="value">{{ config.SQM_HOST }}:{{ config.SQM_PORT }}</span>
+            </div>
+            <button class="btn btn-sm" onclick="testInstrument('sqm')">Test</button>
+            <div id="sqm-result" class="test-result"></div>
+            {% else %}
+            <p class="disabled-text">Not configured</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- WeatherLink -->
+    <div class="instrument-card {% if config.WEATHERLINK_HOST %}enabled{% else %}disabled{% endif %}">
+        <div class="instrument-header">
+            <h3>WeatherLink Live</h3>
+            <span class="status-indicator" id="weatherlink-status">
+                <span class="status-dot {% if config.WEATHERLINK_HOST %}status-gray{% else %}status-off{% endif %}"></span>
+                {% if config.WEATHERLINK_HOST %}Not tested{% else %}Disabled{% endif %}
+            </span>
+        </div>
+        <div class="instrument-body">
+            {% if config.WEATHERLINK_HOST %}
+            <div class="info-row">
+                <span class="label">Host:</span>
+                <span class="value">{{ config.WEATHERLINK_HOST }}</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Interval:</span>
+                <span class="value">{{ config.WEATHERLINK_INTERVAL }}s</span>
+            </div>
+            <button class="btn btn-sm" onclick="testInstrument('weatherlink')">Test</button>
+            <div id="weatherlink-result" class="test-result"></div>
+            {% else %}
+            <p class="disabled-text">Not configured</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Cloudwatcher -->
+    <div class="instrument-card {% if config.CLOUDWATCHER_HOST %}enabled{% else %}disabled{% endif %}">
+        <div class="instrument-header">
+            <h3>AAG Cloudwatcher</h3>
+            <span class="status-indicator" id="cloudwatcher-status">
+                <span class="status-dot {% if config.CLOUDWATCHER_HOST %}status-gray{% else %}status-off{% endif %}"></span>
+                {% if config.CLOUDWATCHER_HOST %}Not tested{% else %}Disabled{% endif %}
+            </span>
+        </div>
+        <div class="instrument-body">
+            {% if config.CLOUDWATCHER_HOST %}
+            <div class="info-row">
+                <span class="label">Host:</span>
+                <span class="value">{{ config.CLOUDWATCHER_HOST }}</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Interval:</span>
+                <span class="value">{{ config.CLOUDWATCHER_INTERVAL }}s</span>
+            </div>
+            <button class="btn btn-sm" onclick="testInstrument('cloudwatcher')">Test</button>
+            <div id="cloudwatcher-result" class="test-result"></div>
+            {% else %}
+            <p class="disabled-text">Not configured</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- AllSky -->
+    <div class="instrument-card {% if config.ALLSKY_IMAGE_PATH or config.ALLSKY_IMAGE_URL %}enabled{% else %}disabled{% endif %}">
+        <div class="instrument-header">
+            <h3>AllSky Camera</h3>
+            <span class="status-indicator" id="allsky-status">
+                <span class="status-dot {% if config.ALLSKY_IMAGE_PATH or config.ALLSKY_IMAGE_URL %}status-gray{% else %}status-off{% endif %}"></span>
+                {% if config.ALLSKY_IMAGE_PATH or config.ALLSKY_IMAGE_URL %}Not tested{% else %}Disabled{% endif %}
+            </span>
+        </div>
+        <div class="instrument-body">
+            {% if config.ALLSKY_IMAGE_PATH %}
+            <div class="info-row">
+                <span class="label">Path:</span>
+                <span class="value truncate">{{ config.ALLSKY_IMAGE_PATH }}</span>
+            </div>
+            {% endif %}
+            {% if config.ALLSKY_IMAGE_URL %}
+            <div class="info-row">
+                <span class="label">URL:</span>
+                <span class="value truncate">{{ config.ALLSKY_IMAGE_URL }}</span>
+            </div>
+            {% endif %}
+            {% if config.ALLSKY_IMAGE_PATH or config.ALLSKY_IMAGE_URL %}
+            <button class="btn btn-sm" onclick="testInstrument('allsky')">Test</button>
+            <div id="allsky-result" class="test-result"></div>
+            {% else %}
+            <p class="disabled-text">Not configured</p>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+
+<!-- BOM Imagery -->
+<div class="card">
+    <div class="card-header">
+        <h2>BOM Satellite & Radar</h2>
+        <span class="status-indicator">
+            <span class="status-dot {% if config.BOM_SATELLITE_ENABLED == 'true' %}status-green{% else %}status-off{% endif %}"></span>
+            {% if config.BOM_SATELLITE_ENABLED == 'true' %}Enabled{% else %}Disabled{% endif %}
+        </span>
+    </div>
+    <div class="card-body">
+        {% if config.BOM_SATELLITE_ENABLED == 'true' %}
+        <div class="info-row">
+            <span class="label">Radar Station:</span>
+            <span class="value">{{ config.BOM_RADAR_STATION or 'Not set' }}</span>
+        </div>
+        <div class="info-row">
+            <span class="label">Interval:</span>
+            <span class="value">{{ config.BOM_SATELLITE_INTERVAL }}s</span>
+        </div>
+        {% else %}
+        <p class="disabled-text">BOM imagery fetching is disabled</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Push Settings -->
+<div class="card">
+    <div class="card-header">
+        <h2>Data Push Settings</h2>
+    </div>
+    <div class="card-body">
+        <div class="info-row">
+            <span class="label">Push Interval:</span>
+            <span class="value">{{ config.PUSH_INTERVAL }} seconds</span>
+        </div>
+        <div class="info-row">
+            <span class="label">Log Level:</span>
+            <span class="value">{{ config.LOG_LEVEL }}</span>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Store config for tests
+const currentConfig = {
+    apiUrl: "{{ config.REMOTE_API_URL }}",
+    sqmHost: "{{ config.SQM_HOST }}",
+    sqmPort: "{{ config.SQM_PORT }}",
+    weatherlinkHost: "{{ config.WEATHERLINK_HOST }}",
+    cloudwatcherHost: "{{ config.CLOUDWATCHER_HOST }}",
+    allskyPath: "{{ config.ALLSKY_IMAGE_PATH }}",
+    allskyUrl: "{{ config.ALLSKY_IMAGE_URL }}"
+};
+
+function testApiConnection() {
+    const resultDiv = document.getElementById('api-result');
+    const statusDiv = document.getElementById('api-status');
+    resultDiv.innerHTML = '<span class="loading">Testing...</span>';
+
+    fetch('/api/test/api', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            url: currentConfig.apiUrl,
+            api_key: '****'  // Use stored key
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            statusDiv.innerHTML = '<span class="status-dot status-green"></span> Connected';
+            resultDiv.innerHTML = '<span class="success">Connected successfully</span>';
+            if (data.data && data.data.current) {
+                const c = data.data.current;
+                resultDiv.innerHTML += `<div class="reading-preview">
+                    <span>Temp: ${c.temperature}°C</span>
+                    <span>Humidity: ${c.humidity}%</span>
+                    <span>SQM: ${c.sky_quality || 'N/A'}</span>
+                </div>`;
+            }
+        } else {
+            statusDiv.innerHTML = '<span class="status-dot status-red"></span> Error';
+            resultDiv.innerHTML = `<span class="error">${data.message}</span>`;
+        }
+    })
+    .catch(err => {
+        statusDiv.innerHTML = '<span class="status-dot status-red"></span> Error';
+        resultDiv.innerHTML = `<span class="error">${err}</span>`;
+    });
+}
+
+function testInstrument(type) {
+    const resultDiv = document.getElementById(`${type}-result`);
+    const statusDiv = document.getElementById(`${type}-status`);
+    resultDiv.innerHTML = '<span class="loading">Testing...</span>';
+
+    let endpoint, body;
+    switch(type) {
+        case 'sqm':
+            endpoint = '/api/test/sqm';
+            body = {host: currentConfig.sqmHost, port: parseInt(currentConfig.sqmPort)};
+            break;
+        case 'weatherlink':
+            endpoint = '/api/test/weatherlink';
+            body = {host: currentConfig.weatherlinkHost};
+            break;
+        case 'cloudwatcher':
+            endpoint = '/api/test/cloudwatcher';
+            body = {host: currentConfig.cloudwatcherHost};
+            break;
+        case 'allsky':
+            endpoint = '/api/test/allsky';
+            body = {path: currentConfig.allskyPath, url: currentConfig.allskyUrl};
+            break;
+    }
+
+    fetch(endpoint, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            statusDiv.innerHTML = '<span class="status-dot status-green"></span> Connected';
+            resultDiv.innerHTML = `<span class="success">${data.message}</span>`;
+            if (data.data) {
+                let preview = '<div class="reading-preview">';
+                for (const [key, value] of Object.entries(data.data)) {
+                    if (value !== null && key !== 'raw') {
+                        preview += `<span>${key}: ${value}</span>`;
+                    }
+                }
+                preview += '</div>';
+                resultDiv.innerHTML += preview;
+            }
+        } else {
+            statusDiv.innerHTML = '<span class="status-dot status-red"></span> Error';
+            resultDiv.innerHTML = `<span class="error">${data.message}</span>`;
+        }
+    })
+    .catch(err => {
+        statusDiv.innerHTML = '<span class="status-dot status-red"></span> Error';
+        resultDiv.innerHTML = `<span class="error">${err}</span>`;
+    });
+}
+
+function controlService(action) {
+    if (!confirm(`Are you sure you want to ${action} the collector service?`)) {
+        return;
+    }
+
+    fetch(`/api/service/${action}`, {method: 'POST'})
+    .then(r => r.json())
+    .then(data => {
+        alert(data.message);
+        if (data.success) {
+            setTimeout(() => location.reload(), 1000);
+        }
+    })
+    .catch(err => alert(`Error: ${err}`));
+}
+</script>
+{% endblock %}

@@ -1,0 +1,732 @@
+{% extends "base.html" %}
+
+{% block title %}Setup Wizard - Observatory Configurator{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Setup Wizard</h1>
+    <p class="subtitle">Configure your observatory data collector step by step</p>
+</div>
+
+<!-- Progress Bar -->
+<div class="wizard-progress">
+    <div class="progress-steps">
+        <div class="step active" data-step="1">
+            <span class="step-number">1</span>
+            <span class="step-label">API</span>
+        </div>
+        <div class="step" data-step="2">
+            <span class="step-number">2</span>
+            <span class="step-label">Weather</span>
+        </div>
+        <div class="step" data-step="3">
+            <span class="step-number">3</span>
+            <span class="step-label">SQM</span>
+        </div>
+        <div class="step" data-step="4">
+            <span class="step-number">4</span>
+            <span class="step-label">Cloud</span>
+        </div>
+        <div class="step" data-step="5">
+            <span class="step-number">5</span>
+            <span class="step-label">AllSky</span>
+        </div>
+        <div class="step" data-step="6">
+            <span class="step-number">6</span>
+            <span class="step-label">BOM</span>
+        </div>
+        <div class="step" data-step="7">
+            <span class="step-number">7</span>
+            <span class="step-label">Review</span>
+        </div>
+    </div>
+    <div class="progress-bar">
+        <div class="progress-fill" id="progress-fill"></div>
+    </div>
+</div>
+
+<!-- Wizard Steps -->
+<form id="wizard-form">
+
+    <!-- Step 1: API Connection -->
+    <div class="wizard-step active" data-step="1">
+        <div class="card">
+            <div class="card-header">
+                <h2>API Connection</h2>
+            </div>
+            <div class="card-body">
+                <p class="step-description">
+                    Connect to your Vercel-hosted dashboard. You'll need the deployment URL and the API key
+                    from your Vercel environment variables.
+                </p>
+
+                <div class="form-group">
+                    <label for="api_url">Dashboard URL</label>
+                    <input type="url" id="api_url" name="REMOTE_API_URL"
+                           value="{{ config.REMOTE_API_URL }}"
+                           placeholder="https://your-site.vercel.app/api/ingest"
+                           required>
+                    <span class="help-text">The full URL to your Vercel deployment's ingest endpoint</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="api_key">API Key</label>
+                    <input type="password" id="api_key" name="API_KEY"
+                           value="{{ config.API_KEY }}"
+                           placeholder="Enter your INGEST_API_KEY"
+                           required>
+                    <span class="help-text">The INGEST_API_KEY from your Vercel environment variables</span>
+                </div>
+
+                <button type="button" class="btn btn-primary" onclick="testStep1()">
+                    Test Connection
+                </button>
+                <div id="step1-result" class="test-result"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 2: Weather Station -->
+    <div class="wizard-step" data-step="2">
+        <div class="card">
+            <div class="card-header">
+                <h2>Weather Station</h2>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="weatherlink_enabled"
+                           {% if config.WEATHERLINK_HOST %}checked{% endif %}>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="card-body">
+                <p class="step-description">
+                    Configure your Davis WeatherLink Live device for temperature, humidity, wind, and pressure data.
+                </p>
+
+                <div class="conditional-fields" id="weatherlink-fields">
+                    <div class="form-group">
+                        <label for="weatherlink_host">WeatherLink IP Address</label>
+                        <input type="text" id="weatherlink_host" name="WEATHERLINK_HOST"
+                               value="{{ config.WEATHERLINK_HOST }}"
+                               placeholder="192.168.1.100">
+                        <span class="help-text">Local IP address of your WeatherLink Live device</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="weatherlink_interval">Polling Interval (seconds)</label>
+                        <input type="range" id="weatherlink_interval" name="WEATHERLINK_INTERVAL"
+                               min="10" max="120" step="5"
+                               value="{{ config.WEATHERLINK_INTERVAL }}"
+                               oninput="document.getElementById('weatherlink_interval_val').textContent = this.value">
+                        <span class="range-value" id="weatherlink_interval_val">{{ config.WEATHERLINK_INTERVAL }}</span>
+                    </div>
+
+                    <button type="button" class="btn btn-primary" onclick="testStep2()">
+                        Test Connection
+                    </button>
+                    <div id="step2-result" class="test-result"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 3: SQM -->
+    <div class="wizard-step" data-step="3">
+        <div class="card">
+            <div class="card-header">
+                <h2>Sky Quality Meter</h2>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="sqm_enabled"
+                           {% if config.SQM_HOST %}checked{% endif %}>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="card-body">
+                <p class="step-description">
+                    Configure your Unihedron SQM-LE sky quality meter for darkness measurements.
+                </p>
+
+                <div class="conditional-fields" id="sqm-fields">
+                    <div class="form-group">
+                        <label for="sqm_host">SQM IP Address</label>
+                        <input type="text" id="sqm_host" name="SQM_HOST"
+                               value="{{ config.SQM_HOST }}"
+                               placeholder="192.168.1.101">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="sqm_port">SQM Port</label>
+                        <input type="number" id="sqm_port" name="SQM_PORT"
+                               value="{{ config.SQM_PORT }}"
+                               placeholder="10001">
+                        <span class="help-text">Default is 10001</span>
+                    </div>
+
+                    <button type="button" class="btn btn-primary" onclick="testStep3()">
+                        Test Connection
+                    </button>
+                    <div id="step3-result" class="test-result"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 4: Cloudwatcher -->
+    <div class="wizard-step" data-step="4">
+        <div class="card">
+            <div class="card-header">
+                <h2>Cloud Sensor</h2>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="cloudwatcher_enabled"
+                           {% if config.CLOUDWATCHER_HOST %}checked{% endif %}>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="card-body">
+                <p class="step-description">
+                    Configure your AAG Cloudwatcher for cloud, rain, and sky condition monitoring.
+                </p>
+
+                <div class="conditional-fields" id="cloudwatcher-fields">
+                    <div class="form-group">
+                        <label for="cloudwatcher_host">Cloudwatcher IP Address</label>
+                        <input type="text" id="cloudwatcher_host" name="CLOUDWATCHER_HOST"
+                               value="{{ config.CLOUDWATCHER_HOST }}"
+                               placeholder="192.168.1.102">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="cloudwatcher_interval">Polling Interval (seconds)</label>
+                        <input type="range" id="cloudwatcher_interval" name="CLOUDWATCHER_INTERVAL"
+                               min="10" max="120" step="5"
+                               value="{{ config.CLOUDWATCHER_INTERVAL }}"
+                               oninput="document.getElementById('cloudwatcher_interval_val').textContent = this.value">
+                        <span class="range-value" id="cloudwatcher_interval_val">{{ config.CLOUDWATCHER_INTERVAL }}</span>
+                    </div>
+
+                    <button type="button" class="btn btn-primary" onclick="testStep4()">
+                        Test Connection
+                    </button>
+                    <div id="step4-result" class="test-result"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 5: AllSky -->
+    <div class="wizard-step" data-step="5">
+        <div class="card">
+            <div class="card-header">
+                <h2>AllSky Camera</h2>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="allsky_enabled"
+                           {% if config.ALLSKY_IMAGE_PATH or config.ALLSKY_IMAGE_URL %}checked{% endif %}>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="card-body">
+                <p class="step-description">
+                    Configure your AllSky camera image source. You can use a local file path or a URL.
+                </p>
+
+                <div class="conditional-fields" id="allsky-fields">
+                    <div class="form-group">
+                        <label for="allsky_path">Local File Path</label>
+                        <input type="text" id="allsky_path" name="ALLSKY_IMAGE_PATH"
+                               value="{{ config.ALLSKY_IMAGE_PATH }}"
+                               placeholder="/home/pi/allsky/tmp/image.jpg">
+                        <span class="help-text">Path to the AllSky image file on this Pi</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="allsky_url">Fallback URL (optional)</label>
+                        <input type="url" id="allsky_url" name="ALLSKY_IMAGE_URL"
+                               value="{{ config.ALLSKY_IMAGE_URL }}"
+                               placeholder="http://192.168.1.200/current/tmp/image.jpg">
+                        <span class="help-text">URL to fetch image if local file is unavailable</span>
+                    </div>
+
+                    <button type="button" class="btn btn-primary" onclick="testStep5()">
+                        Test Image Source
+                    </button>
+                    <div id="step5-result" class="test-result"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 6: BOM Imagery -->
+    <div class="wizard-step" data-step="6">
+        <div class="card">
+            <div class="card-header">
+                <h2>BOM Satellite & Radar</h2>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="bom_enabled"
+                           {% if config.BOM_SATELLITE_ENABLED == 'true' %}checked{% endif %}>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="card-body">
+                <p class="step-description">
+                    Enable fetching of Bureau of Meteorology satellite and radar imagery for your dashboard.
+                </p>
+
+                <div class="conditional-fields" id="bom-fields">
+                    <div class="form-group">
+                        <label for="bom_radar_station">Radar Station</label>
+                        <select id="bom_radar_station" name="BOM_RADAR_STATION">
+                            <option value="">-- Select your nearest station --</option>
+                            {% for code, name in radar_stations.items() %}
+                            <option value="{{ code }}" {% if config.BOM_RADAR_STATION == code %}selected{% endif %}>
+                                {{ name }} ({{ code }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="bom_interval">Fetch Interval (seconds)</label>
+                        <input type="range" id="bom_interval" name="BOM_SATELLITE_INTERVAL"
+                               min="300" max="1800" step="60"
+                               value="{{ config.BOM_SATELLITE_INTERVAL }}"
+                               oninput="document.getElementById('bom_interval_val').textContent = this.value">
+                        <span class="range-value" id="bom_interval_val">{{ config.BOM_SATELLITE_INTERVAL }}</span>
+                        <span class="help-text">Recommended: 600 seconds (10 minutes)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 7: Review -->
+    <div class="wizard-step" data-step="7">
+        <div class="card">
+            <div class="card-header">
+                <h2>Review & Apply</h2>
+            </div>
+            <div class="card-body">
+                <p class="step-description">
+                    Review your configuration and apply the changes. The collector service will be restarted.
+                </p>
+
+                <div class="review-summary" id="review-summary">
+                    <!-- Populated by JavaScript -->
+                </div>
+
+                <div class="form-group">
+                    <label for="push_interval">Data Push Interval (seconds)</label>
+                    <input type="range" id="push_interval" name="PUSH_INTERVAL"
+                           min="10" max="300" step="10"
+                           value="{{ config.PUSH_INTERVAL }}"
+                           oninput="document.getElementById('push_interval_val').textContent = this.value">
+                    <span class="range-value" id="push_interval_val">{{ config.PUSH_INTERVAL }}</span>
+                    <span class="help-text">How often to push data to your dashboard</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="log_level">Log Level</label>
+                    <select id="log_level" name="LOG_LEVEL">
+                        <option value="DEBUG" {% if config.LOG_LEVEL == 'DEBUG' %}selected{% endif %}>DEBUG</option>
+                        <option value="INFO" {% if config.LOG_LEVEL == 'INFO' %}selected{% endif %}>INFO</option>
+                        <option value="WARNING" {% if config.LOG_LEVEL == 'WARNING' %}selected{% endif %}>WARNING</option>
+                        <option value="ERROR" {% if config.LOG_LEVEL == 'ERROR' %}selected{% endif %}>ERROR</option>
+                    </select>
+                </div>
+
+                <div class="form-actions">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="restart_service" checked>
+                        Restart collector service after saving
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</form>
+
+<!-- Navigation Buttons -->
+<div class="wizard-nav">
+    <button type="button" class="btn btn-secondary" id="btn-prev" onclick="prevStep()" disabled>
+        Previous
+    </button>
+    <button type="button" class="btn btn-primary" id="btn-next" onclick="nextStep()">
+        Next
+    </button>
+    <button type="button" class="btn btn-success" id="btn-save" onclick="saveConfig()" style="display: none;">
+        Save & Apply
+    </button>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentStep = 1;
+const totalSteps = 7;
+
+function updateProgress() {
+    // Update progress bar
+    const fill = document.getElementById('progress-fill');
+    fill.style.width = `${(currentStep / totalSteps) * 100}%`;
+
+    // Update step indicators
+    document.querySelectorAll('.progress-steps .step').forEach(step => {
+        const stepNum = parseInt(step.dataset.step);
+        step.classList.toggle('active', stepNum === currentStep);
+        step.classList.toggle('completed', stepNum < currentStep);
+    });
+
+    // Update step visibility
+    document.querySelectorAll('.wizard-step').forEach(step => {
+        step.classList.toggle('active', parseInt(step.dataset.step) === currentStep);
+    });
+
+    // Update buttons
+    document.getElementById('btn-prev').disabled = currentStep === 1;
+    document.getElementById('btn-next').style.display = currentStep === totalSteps ? 'none' : 'inline-block';
+    document.getElementById('btn-save').style.display = currentStep === totalSteps ? 'inline-block' : 'none';
+
+    // Update review summary on last step
+    if (currentStep === totalSteps) {
+        updateReviewSummary();
+    }
+}
+
+function nextStep() {
+    if (currentStep < totalSteps) {
+        currentStep++;
+        updateProgress();
+    }
+}
+
+function prevStep() {
+    if (currentStep > 1) {
+        currentStep--;
+        updateProgress();
+    }
+}
+
+function goToStep(step) {
+    currentStep = step;
+    updateProgress();
+}
+
+function updateReviewSummary() {
+    const summary = document.getElementById('review-summary');
+    const form = document.getElementById('wizard-form');
+
+    let html = '<table class="review-table">';
+
+    // API
+    html += `<tr><th colspan="2">API Connection</th></tr>`;
+    html += `<tr><td>URL</td><td>${form.REMOTE_API_URL.value}</td></tr>`;
+    html += `<tr><td>API Key</td><td>****${form.API_KEY.value.slice(-4)}</td></tr>`;
+
+    // Weather
+    if (document.getElementById('weatherlink_enabled').checked) {
+        html += `<tr><th colspan="2">Weather Station</th></tr>`;
+        html += `<tr><td>Host</td><td>${form.WEATHERLINK_HOST.value}</td></tr>`;
+        html += `<tr><td>Interval</td><td>${form.WEATHERLINK_INTERVAL.value}s</td></tr>`;
+    }
+
+    // SQM
+    if (document.getElementById('sqm_enabled').checked) {
+        html += `<tr><th colspan="2">Sky Quality Meter</th></tr>`;
+        html += `<tr><td>Host</td><td>${form.SQM_HOST.value}:${form.SQM_PORT.value}</td></tr>`;
+    }
+
+    // Cloudwatcher
+    if (document.getElementById('cloudwatcher_enabled').checked) {
+        html += `<tr><th colspan="2">Cloud Sensor</th></tr>`;
+        html += `<tr><td>Host</td><td>${form.CLOUDWATCHER_HOST.value}</td></tr>`;
+        html += `<tr><td>Interval</td><td>${form.CLOUDWATCHER_INTERVAL.value}s</td></tr>`;
+    }
+
+    // AllSky
+    if (document.getElementById('allsky_enabled').checked) {
+        html += `<tr><th colspan="2">AllSky Camera</th></tr>`;
+        if (form.ALLSKY_IMAGE_PATH.value) {
+            html += `<tr><td>Path</td><td>${form.ALLSKY_IMAGE_PATH.value}</td></tr>`;
+        }
+        if (form.ALLSKY_IMAGE_URL.value) {
+            html += `<tr><td>URL</td><td>${form.ALLSKY_IMAGE_URL.value}</td></tr>`;
+        }
+    }
+
+    // BOM
+    if (document.getElementById('bom_enabled').checked) {
+        html += `<tr><th colspan="2">BOM Imagery</th></tr>`;
+        html += `<tr><td>Radar Station</td><td>${form.BOM_RADAR_STATION.value || 'Not set'}</td></tr>`;
+        html += `<tr><td>Interval</td><td>${form.BOM_SATELLITE_INTERVAL.value}s</td></tr>`;
+    }
+
+    html += '</table>';
+    summary.innerHTML = html;
+}
+
+// Toggle conditional fields based on checkbox state
+function setupToggles() {
+    const toggles = [
+        ['weatherlink_enabled', 'weatherlink-fields', 'WEATHERLINK_HOST'],
+        ['sqm_enabled', 'sqm-fields', 'SQM_HOST'],
+        ['cloudwatcher_enabled', 'cloudwatcher-fields', 'CLOUDWATCHER_HOST'],
+        ['allsky_enabled', 'allsky-fields', 'ALLSKY_IMAGE_PATH'],
+        ['bom_enabled', 'bom-fields', null]
+    ];
+
+    toggles.forEach(([checkboxId, fieldsId, clearField]) => {
+        const checkbox = document.getElementById(checkboxId);
+        const fields = document.getElementById(fieldsId);
+
+        function updateVisibility() {
+            fields.style.display = checkbox.checked ? 'block' : 'none';
+            if (!checkbox.checked && clearField) {
+                const input = document.querySelector(`[name="${clearField}"]`);
+                if (input) input.value = '';
+            }
+        }
+
+        checkbox.addEventListener('change', updateVisibility);
+        updateVisibility();
+    });
+}
+
+// Test functions for each step
+function testStep1() {
+    const resultDiv = document.getElementById('step1-result');
+    resultDiv.innerHTML = '<span class="loading">Testing connection...</span>';
+
+    fetch('/api/test/api', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            url: document.getElementById('api_url').value,
+            api_key: document.getElementById('api_key').value
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            resultDiv.innerHTML = '<span class="success">Connection successful!</span>';
+        } else {
+            resultDiv.innerHTML = `<span class="error">${data.message}</span>`;
+        }
+    })
+    .catch(err => {
+        resultDiv.innerHTML = `<span class="error">${err}</span>`;
+    });
+}
+
+function testStep2() {
+    const resultDiv = document.getElementById('step2-result');
+    resultDiv.innerHTML = '<span class="loading">Testing connection...</span>';
+
+    fetch('/api/test/weatherlink', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            host: document.getElementById('weatherlink_host').value
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            let html = '<span class="success">Connected!</span>';
+            if (data.data) {
+                html += '<div class="reading-preview">';
+                if (data.data.temperature_c !== undefined) html += `<span>Temp: ${data.data.temperature_c}°C</span>`;
+                if (data.data.humidity !== undefined) html += `<span>Humidity: ${data.data.humidity}%</span>`;
+                if (data.data.pressure_hpa !== undefined) html += `<span>Pressure: ${data.data.pressure_hpa} hPa</span>`;
+                html += '</div>';
+            }
+            resultDiv.innerHTML = html;
+        } else {
+            resultDiv.innerHTML = `<span class="error">${data.message}</span>`;
+        }
+    })
+    .catch(err => {
+        resultDiv.innerHTML = `<span class="error">${err}</span>`;
+    });
+}
+
+function testStep3() {
+    const resultDiv = document.getElementById('step3-result');
+    resultDiv.innerHTML = '<span class="loading">Testing connection...</span>';
+
+    fetch('/api/test/sqm', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            host: document.getElementById('sqm_host').value,
+            port: parseInt(document.getElementById('sqm_port').value)
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            let html = '<span class="success">Connected!</span>';
+            if (data.data) {
+                html += '<div class="reading-preview">';
+                if (data.data.sky_quality !== undefined) html += `<span>Sky Quality: ${data.data.sky_quality} mag/arcsec²</span>`;
+                if (data.data.temperature !== undefined) html += `<span>Temp: ${data.data.temperature}°C</span>`;
+                html += '</div>';
+            }
+            resultDiv.innerHTML = html;
+        } else {
+            resultDiv.innerHTML = `<span class="error">${data.message}</span>`;
+        }
+    })
+    .catch(err => {
+        resultDiv.innerHTML = `<span class="error">${err}</span>`;
+    });
+}
+
+function testStep4() {
+    const resultDiv = document.getElementById('step4-result');
+    resultDiv.innerHTML = '<span class="loading">Testing connection...</span>';
+
+    fetch('/api/test/cloudwatcher', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            host: document.getElementById('cloudwatcher_host').value
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            let html = '<span class="success">Connected!</span>';
+            if (data.data) {
+                html += '<div class="reading-preview">';
+                html += `<span>Cloud: ${data.data.cloud_safe ? 'Clear' : 'Cloudy'}</span>`;
+                html += `<span>Rain: ${data.data.rain_safe ? 'Dry' : 'Wet'}</span>`;
+                html += `<span>Wind: ${data.data.wind_safe ? 'Calm' : 'Windy'}</span>`;
+                html += '</div>';
+            }
+            resultDiv.innerHTML = html;
+        } else {
+            resultDiv.innerHTML = `<span class="error">${data.message}</span>`;
+        }
+    })
+    .catch(err => {
+        resultDiv.innerHTML = `<span class="error">${err}</span>`;
+    });
+}
+
+function testStep5() {
+    const resultDiv = document.getElementById('step5-result');
+    resultDiv.innerHTML = '<span class="loading">Testing image source...</span>';
+
+    fetch('/api/test/allsky', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            path: document.getElementById('allsky_path').value,
+            url: document.getElementById('allsky_url').value
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            resultDiv.innerHTML = `<span class="success">${data.message}</span>`;
+        } else {
+            resultDiv.innerHTML = `<span class="error">${data.message}</span>`;
+        }
+    })
+    .catch(err => {
+        resultDiv.innerHTML = `<span class="error">${err}</span>`;
+    });
+}
+
+function saveConfig() {
+    const form = document.getElementById('wizard-form');
+    const config = {};
+
+    // Collect all form values
+    config.REMOTE_API_URL = form.REMOTE_API_URL.value;
+    config.API_KEY = form.API_KEY.value;
+
+    // WeatherLink
+    if (document.getElementById('weatherlink_enabled').checked) {
+        config.WEATHERLINK_HOST = form.WEATHERLINK_HOST.value;
+        config.WEATHERLINK_INTERVAL = form.WEATHERLINK_INTERVAL.value;
+    } else {
+        config.WEATHERLINK_HOST = '';
+    }
+
+    // SQM
+    if (document.getElementById('sqm_enabled').checked) {
+        config.SQM_HOST = form.SQM_HOST.value;
+        config.SQM_PORT = form.SQM_PORT.value;
+    } else {
+        config.SQM_HOST = '';
+    }
+
+    // Cloudwatcher
+    if (document.getElementById('cloudwatcher_enabled').checked) {
+        config.CLOUDWATCHER_HOST = form.CLOUDWATCHER_HOST.value;
+        config.CLOUDWATCHER_INTERVAL = form.CLOUDWATCHER_INTERVAL.value;
+    } else {
+        config.CLOUDWATCHER_HOST = '';
+    }
+
+    // AllSky
+    if (document.getElementById('allsky_enabled').checked) {
+        config.ALLSKY_IMAGE_PATH = form.ALLSKY_IMAGE_PATH.value;
+        config.ALLSKY_IMAGE_URL = form.ALLSKY_IMAGE_URL.value;
+    } else {
+        config.ALLSKY_IMAGE_PATH = '';
+        config.ALLSKY_IMAGE_URL = '';
+    }
+
+    // BOM
+    config.BOM_SATELLITE_ENABLED = document.getElementById('bom_enabled').checked ? 'true' : 'false';
+    if (document.getElementById('bom_enabled').checked) {
+        config.BOM_RADAR_STATION = form.BOM_RADAR_STATION.value;
+        config.BOM_SATELLITE_INTERVAL = form.BOM_SATELLITE_INTERVAL.value;
+    }
+
+    // Other settings
+    config.PUSH_INTERVAL = form.PUSH_INTERVAL.value;
+    config.LOG_LEVEL = form.LOG_LEVEL.value;
+
+    // Save config
+    fetch('/api/config', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(config)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            // Restart service if checked
+            if (document.getElementById('restart_service').checked) {
+                fetch('/api/service/restart', {method: 'POST'})
+                .then(r => r.json())
+                .then(restartData => {
+                    alert('Configuration saved and service restarted!');
+                    window.location.href = '/status';
+                })
+                .catch(err => {
+                    alert('Configuration saved but failed to restart service: ' + err);
+                });
+            } else {
+                alert('Configuration saved!');
+                window.location.href = '/status';
+            }
+        } else {
+            alert('Failed to save configuration: ' + data.message);
+        }
+    })
+    .catch(err => {
+        alert('Error: ' + err);
+    });
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    setupToggles();
+    updateProgress();
+});
+</script>
+{% endblock %}

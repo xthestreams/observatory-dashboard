@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Logs - Observatory Configurator{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Log Viewer</h1>
+    <p class="subtitle">View collector service logs</p>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2>Service Logs</h2>
+        <div class="log-controls">
+            <select id="log-level" onchange="refreshLogs()">
+                <option value="ALL">All Levels</option>
+                <option value="DEBUG">DEBUG</option>
+                <option value="INFO">INFO</option>
+                <option value="WARNING">WARNING</option>
+                <option value="ERROR">ERROR</option>
+            </select>
+            <select id="log-lines" onchange="refreshLogs()">
+                <option value="50">50 lines</option>
+                <option value="100" selected>100 lines</option>
+                <option value="200">200 lines</option>
+                <option value="500">500 lines</option>
+            </select>
+            <label class="checkbox-label">
+                <input type="checkbox" id="auto-refresh" checked onchange="toggleAutoRefresh()">
+                Auto-refresh
+            </label>
+            <button class="btn btn-sm" onclick="refreshLogs()">Refresh</button>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="log-container" id="log-container">
+            <pre id="log-output">Loading logs...</pre>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let autoRefreshInterval = null;
+
+function refreshLogs() {
+    const level = document.getElementById('log-level').value;
+    const lines = document.getElementById('log-lines').value;
+    const output = document.getElementById('log-output');
+
+    fetch(`/api/logs?level=${level}&lines=${lines}`)
+    .then(r => r.json())
+    .then(data => {
+        if (data.logs && data.logs.length > 0) {
+            output.innerHTML = data.logs.map(line => highlightLog(line)).join('\n');
+        } else {
+            output.textContent = 'No logs available';
+        }
+        // Auto-scroll to bottom
+        const container = document.getElementById('log-container');
+        container.scrollTop = container.scrollHeight;
+    })
+    .catch(err => {
+        output.textContent = `Error loading logs: ${err}`;
+    });
+}
+
+function highlightLog(line) {
+    // Escape HTML
+    line = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    // Highlight log levels
+    if (line.includes('ERROR')) {
+        return `<span class="log-error">${line}</span>`;
+    } else if (line.includes('WARNING')) {
+        return `<span class="log-warning">${line}</span>`;
+    } else if (line.includes('DEBUG')) {
+        return `<span class="log-debug">${line}</span>`;
+    } else if (line.includes('INFO')) {
+        return `<span class="log-info">${line}</span>`;
+    }
+    return line;
+}
+
+function toggleAutoRefresh() {
+    const enabled = document.getElementById('auto-refresh').checked;
+
+    if (enabled) {
+        autoRefreshInterval = setInterval(refreshLogs, 5000);
+    } else {
+        if (autoRefreshInterval) {
+            clearInterval(autoRefreshInterval);
+            autoRefreshInterval = null;
+        }
+    }
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    refreshLogs();
+    toggleAutoRefresh();
+});
+</script>
+{% endblock %}

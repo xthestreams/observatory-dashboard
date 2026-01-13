@@ -1,0 +1,308 @@
+{% extends "base.html" %}
+
+{% block title %}Configuration - Observatory Configurator{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Configuration Editor</h1>
+    <p class="subtitle">Advanced configuration for the observatory collector</p>
+</div>
+
+<form id="config-form">
+
+    <!-- API Section -->
+    <div class="card">
+        <div class="card-header">
+            <h2>API Connection</h2>
+        </div>
+        <div class="card-body">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="REMOTE_API_URL">Dashboard URL</label>
+                    <input type="url" id="REMOTE_API_URL" name="REMOTE_API_URL"
+                           value="{{ config.REMOTE_API_URL }}">
+                </div>
+                <div class="form-group">
+                    <label for="API_KEY">API Key</label>
+                    <input type="password" id="API_KEY" name="API_KEY"
+                           value="{{ config.API_KEY }}"
+                           placeholder="Enter new key or leave to keep existing">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MQTT Section -->
+    <div class="card">
+        <div class="card-header">
+            <h2>MQTT Broker</h2>
+        </div>
+        <div class="card-body">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="MQTT_BROKER">Broker Host</label>
+                    <input type="text" id="MQTT_BROKER" name="MQTT_BROKER"
+                           value="{{ config.MQTT_BROKER }}"
+                           placeholder="{{ defaults.MQTT_BROKER }}">
+                </div>
+                <div class="form-group">
+                    <label for="MQTT_PORT">Broker Port</label>
+                    <input type="number" id="MQTT_PORT" name="MQTT_PORT"
+                           value="{{ config.MQTT_PORT }}"
+                           placeholder="{{ defaults.MQTT_PORT }}">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SQM Section -->
+    <div class="card">
+        <div class="card-header">
+            <h2>Sky Quality Meter (SQM-LE)</h2>
+        </div>
+        <div class="card-body">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="SQM_HOST">Host</label>
+                    <input type="text" id="SQM_HOST" name="SQM_HOST"
+                           value="{{ config.SQM_HOST }}"
+                           placeholder="192.168.1.x (leave empty to disable)">
+                </div>
+                <div class="form-group">
+                    <label for="SQM_PORT">Port</label>
+                    <input type="number" id="SQM_PORT" name="SQM_PORT"
+                           value="{{ config.SQM_PORT }}"
+                           placeholder="{{ defaults.SQM_PORT }}">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="INSTRUMENT_CODE_SQM">Instrument Code</label>
+                <input type="text" id="INSTRUMENT_CODE_SQM" name="INSTRUMENT_CODE_SQM"
+                       value="{{ config.INSTRUMENT_CODE_SQM }}"
+                       placeholder="{{ defaults.INSTRUMENT_CODE_SQM }}">
+                <span class="help-text">Unique identifier for this SQM in multi-instrument setups</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- WeatherLink Section -->
+    <div class="card">
+        <div class="card-header">
+            <h2>WeatherLink Live</h2>
+        </div>
+        <div class="card-body">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="WEATHERLINK_HOST">Host</label>
+                    <input type="text" id="WEATHERLINK_HOST" name="WEATHERLINK_HOST"
+                           value="{{ config.WEATHERLINK_HOST }}"
+                           placeholder="192.168.1.x (leave empty to disable)">
+                </div>
+                <div class="form-group">
+                    <label for="WEATHERLINK_INTERVAL">Polling Interval (s)</label>
+                    <input type="number" id="WEATHERLINK_INTERVAL" name="WEATHERLINK_INTERVAL"
+                           value="{{ config.WEATHERLINK_INTERVAL }}"
+                           min="10" max="300"
+                           placeholder="{{ defaults.WEATHERLINK_INTERVAL }}">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="INSTRUMENT_CODE_WEATHERLINK">Instrument Code</label>
+                <input type="text" id="INSTRUMENT_CODE_WEATHERLINK" name="INSTRUMENT_CODE_WEATHERLINK"
+                       value="{{ config.INSTRUMENT_CODE_WEATHERLINK }}"
+                       placeholder="{{ defaults.INSTRUMENT_CODE_WEATHERLINK }}">
+            </div>
+        </div>
+    </div>
+
+    <!-- Cloudwatcher Section -->
+    <div class="card">
+        <div class="card-header">
+            <h2>AAG Cloudwatcher</h2>
+        </div>
+        <div class="card-body">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="CLOUDWATCHER_HOST">CGI Host</label>
+                    <input type="text" id="CLOUDWATCHER_HOST" name="CLOUDWATCHER_HOST"
+                           value="{{ config.CLOUDWATCHER_HOST }}"
+                           placeholder="192.168.1.x (leave empty to disable)">
+                </div>
+                <div class="form-group">
+                    <label for="CLOUDWATCHER_INTERVAL">Polling Interval (s)</label>
+                    <input type="number" id="CLOUDWATCHER_INTERVAL" name="CLOUDWATCHER_INTERVAL"
+                           value="{{ config.CLOUDWATCHER_INTERVAL }}"
+                           min="10" max="300"
+                           placeholder="{{ defaults.CLOUDWATCHER_INTERVAL }}">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="INSTRUMENT_CODE_CLOUDWATCHER">Instrument Code</label>
+                <input type="text" id="INSTRUMENT_CODE_CLOUDWATCHER" name="INSTRUMENT_CODE_CLOUDWATCHER"
+                       value="{{ config.INSTRUMENT_CODE_CLOUDWATCHER }}"
+                       placeholder="{{ defaults.INSTRUMENT_CODE_CLOUDWATCHER }}">
+            </div>
+        </div>
+    </div>
+
+    <!-- AllSky Section -->
+    <div class="card">
+        <div class="card-header">
+            <h2>AllSky Camera</h2>
+        </div>
+        <div class="card-body">
+            <div class="form-group">
+                <label for="ALLSKY_IMAGE_PATH">Local File Path</label>
+                <input type="text" id="ALLSKY_IMAGE_PATH" name="ALLSKY_IMAGE_PATH"
+                       value="{{ config.ALLSKY_IMAGE_PATH }}"
+                       placeholder="{{ defaults.ALLSKY_IMAGE_PATH }}">
+            </div>
+            <div class="form-group">
+                <label for="ALLSKY_IMAGE_URL">Fallback URL</label>
+                <input type="url" id="ALLSKY_IMAGE_URL" name="ALLSKY_IMAGE_URL"
+                       value="{{ config.ALLSKY_IMAGE_URL }}"
+                       placeholder="http://... (optional)">
+            </div>
+            <div class="form-group">
+                <label for="INSTRUMENT_CODE_ALLSKY">Instrument Code</label>
+                <input type="text" id="INSTRUMENT_CODE_ALLSKY" name="INSTRUMENT_CODE_ALLSKY"
+                       value="{{ config.INSTRUMENT_CODE_ALLSKY }}"
+                       placeholder="{{ defaults.INSTRUMENT_CODE_ALLSKY }}">
+            </div>
+        </div>
+    </div>
+
+    <!-- BOM Section -->
+    <div class="card">
+        <div class="card-header">
+            <h2>BOM Satellite & Radar</h2>
+        </div>
+        <div class="card-body">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="BOM_SATELLITE_ENABLED">Enable BOM Imagery</label>
+                    <select id="BOM_SATELLITE_ENABLED" name="BOM_SATELLITE_ENABLED">
+                        <option value="true" {% if config.BOM_SATELLITE_ENABLED == 'true' %}selected{% endif %}>Enabled</option>
+                        <option value="false" {% if config.BOM_SATELLITE_ENABLED != 'true' %}selected{% endif %}>Disabled</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="BOM_SATELLITE_INTERVAL">Fetch Interval (s)</label>
+                    <input type="number" id="BOM_SATELLITE_INTERVAL" name="BOM_SATELLITE_INTERVAL"
+                           value="{{ config.BOM_SATELLITE_INTERVAL }}"
+                           min="300" max="3600"
+                           placeholder="{{ defaults.BOM_SATELLITE_INTERVAL }}">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="BOM_RADAR_STATION">Radar Station</label>
+                <select id="BOM_RADAR_STATION" name="BOM_RADAR_STATION">
+                    <option value="">-- None --</option>
+                    {% for code, name in radar_stations.items() %}
+                    <option value="{{ code }}" {% if config.BOM_RADAR_STATION == code %}selected{% endif %}>
+                        {{ name }} ({{ code }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- General Settings -->
+    <div class="card">
+        <div class="card-header">
+            <h2>General Settings</h2>
+        </div>
+        <div class="card-body">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="PUSH_INTERVAL">Data Push Interval (s)</label>
+                    <input type="number" id="PUSH_INTERVAL" name="PUSH_INTERVAL"
+                           value="{{ config.PUSH_INTERVAL }}"
+                           min="10" max="600"
+                           placeholder="{{ defaults.PUSH_INTERVAL }}">
+                </div>
+                <div class="form-group">
+                    <label for="LOG_LEVEL">Log Level</label>
+                    <select id="LOG_LEVEL" name="LOG_LEVEL">
+                        <option value="DEBUG" {% if config.LOG_LEVEL == 'DEBUG' %}selected{% endif %}>DEBUG</option>
+                        <option value="INFO" {% if config.LOG_LEVEL == 'INFO' %}selected{% endif %}>INFO</option>
+                        <option value="WARNING" {% if config.LOG_LEVEL == 'WARNING' %}selected{% endif %}>WARNING</option>
+                        <option value="ERROR" {% if config.LOG_LEVEL == 'ERROR' %}selected{% endif %}>ERROR</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="INSTRUMENT_CODE_MQTT_WEATHER">MQTT Weather Instrument Code</label>
+                <input type="text" id="INSTRUMENT_CODE_MQTT_WEATHER" name="INSTRUMENT_CODE_MQTT_WEATHER"
+                       value="{{ config.INSTRUMENT_CODE_MQTT_WEATHER }}"
+                       placeholder="{{ defaults.INSTRUMENT_CODE_MQTT_WEATHER }}">
+            </div>
+        </div>
+    </div>
+
+    <!-- Save Actions -->
+    <div class="form-actions card">
+        <div class="card-body">
+            <label class="checkbox-label">
+                <input type="checkbox" id="restart_after_save" checked>
+                Restart collector service after saving
+            </label>
+            <div class="button-group">
+                <button type="button" class="btn btn-secondary" onclick="resetForm()">Reset</button>
+                <button type="button" class="btn btn-success" onclick="saveConfig()">Save Configuration</button>
+            </div>
+        </div>
+    </div>
+
+</form>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function saveConfig() {
+    const form = document.getElementById('config-form');
+    const formData = new FormData(form);
+    const config = {};
+
+    for (const [key, value] of formData.entries()) {
+        config[key] = value;
+    }
+
+    fetch('/api/config', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(config)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            if (document.getElementById('restart_after_save').checked) {
+                fetch('/api/service/restart', {method: 'POST'})
+                .then(r => r.json())
+                .then(restartData => {
+                    alert('Configuration saved and service restarted!');
+                })
+                .catch(err => {
+                    alert('Configuration saved but failed to restart service.');
+                });
+            } else {
+                alert('Configuration saved!');
+            }
+        } else {
+            alert('Failed to save: ' + data.message);
+        }
+    })
+    .catch(err => {
+        alert('Error: ' + err);
+    });
+}
+
+function resetForm() {
+    if (confirm('Reset all fields to current saved values?')) {
+        location.reload();
+    }
+}
+</script>
+{% endblock %}

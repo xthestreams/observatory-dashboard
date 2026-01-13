@@ -6,6 +6,9 @@ import {
 } from "@/lib/instruments";
 import { WeatherData, HistoricalReading, ApiResponse, CloudCondition, RainCondition, WindCondition, DayCondition } from "@/types/weather";
 
+// Force dynamic rendering - this route fetches live data
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     const supabase = createServiceClient();

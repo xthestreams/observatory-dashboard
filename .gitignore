@@ -36,3 +36,12 @@ next-env.d.ts
 
 # Testing
 coverage/
+.env*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+raspberry-pi/venv/

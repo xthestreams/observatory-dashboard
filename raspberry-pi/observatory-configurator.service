@@ -1,0 +1,23 @@
+[Unit]
+Description=Observatory Configurator Web Interface
+After=network.target
+
+[Service]
+Type=simple
+User=ptm
+Group=ptm
+WorkingDirectory=/home/ptm/observatory-collector/configurator
+Environment="PATH=/home/ptm/observatory-collector/venv/bin:/usr/local/bin:/usr/bin:/bin"
+EnvironmentFile=-/home/ptm/observatory-collector/.env
+ExecStart=/home/ptm/observatory-collector/venv/bin/python app.py
+Restart=on-failure
+RestartSec=5
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/ptm/observatory-collector
+
+[Install]
+WantedBy=multi-user.target
