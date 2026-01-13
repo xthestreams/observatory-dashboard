@@ -91,14 +91,26 @@
   border: 1px solid rgba(96, 165, 250, 0.1);
 }
 
-/* Main Grid */
+/* Main Grid - 4 column layout */
 .mainGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 1.5rem;
   padding: 2rem;
   max-width: 1800px;
   margin: 0 auto;
+}
+
+@media (max-width: 1200px) {
+  .mainGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .mainGrid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Panels */
@@ -214,40 +226,44 @@
   color: #60a5fa;
 }
 
-/* Conditions */
+/* Conditions - compact 2x3 grid to match Sky Quality panel size */
 .conditionsPanel {
   grid-column: span 1;
 }
 
-@media (min-width: 1200px) {
-  .conditionsPanel {
+.conditionsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+}
+
+/* BOM Images - simple display without extra borders */
+.bomImageContainer {
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #000;
+}
+
+.bomImage {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* Weather - spans 3 columns on desktop */
+.weatherPanel {
+  grid-column: span 3;
+}
+
+@media (max-width: 1200px) {
+  .weatherPanel {
     grid-column: span 2;
   }
 }
 
-.conditionsGrid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.5rem;
-}
-
 @media (max-width: 600px) {
-  .conditionsGrid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-/* Satellite */
-.satellitePanel {
-  grid-column: 1 / -1;
-}
-
-/* Weather */
-.weatherPanel {
-  grid-column: span 2;
-}
-
-@media (max-width: 900px) {
   .weatherPanel {
     grid-column: span 1;
   }

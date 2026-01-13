@@ -15,7 +15,6 @@ import {
   WeatherStat,
   SQMGauge,
   SQMGraph,
-  SatellitePanel,
   AstronomyPanel,
   ObservatoryInfo,
 } from "@/components";
@@ -156,6 +155,20 @@ export default function Dashboard() {
       />
 
       <main className={styles.mainGrid}>
+        {/* Row 1: Observatory, Astronomy, Sky Quality, AllSky Camera */}
+
+        {/* Observatory Info */}
+        <section className={styles.panel}>
+          <h2 className={styles.panelTitle}>Observatory</h2>
+          <ObservatoryInfo />
+        </section>
+
+        {/* Astronomy - Sun/Moon Data */}
+        <section className={styles.panel}>
+          <h2 className={styles.panelTitle}>Astronomy</h2>
+          <AstronomyPanel />
+        </section>
+
         {/* SQM Panel */}
         <section className={styles.panel}>
           <h2 className={styles.panelTitle}>Sky Quality</h2>
@@ -190,6 +203,23 @@ export default function Dashboard() {
             <SQMGraph history={sqmHistory} historyByInstrument={sqmHistoryByInstrument} />
           </div>
         </section>
+
+        {/* AllSky Camera */}
+        <section className={styles.panel}>
+          <h2 className={styles.panelTitle}>All-Sky Camera</h2>
+          <div className={styles.imageContainer}>
+            <img
+              src={allskyUrl}
+              alt="All-sky view"
+              className={styles.image}
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = "none";
+              }}
+            />
+          </div>
+        </section>
+
+        {/* Row 2: Sky Conditions, BOM Radar, BOM Satellite Visible, BOM Satellite Infrared */}
 
         {/* Cloudwatcher Conditions */}
         <section className={`${styles.panel} ${styles.conditionsPanel}`}>
@@ -264,32 +294,43 @@ export default function Dashboard() {
           </div>
         </section>
 
-        {/* Astronomy - Sun/Moon Data */}
+        {/* BOM Radar */}
         <section className={styles.panel}>
-          <h2 className={styles.panelTitle}>Astronomy</h2>
-          <AstronomyPanel />
-        </section>
-
-        {/* Observatory Info */}
-        <section className={styles.panel}>
-          <h2 className={styles.panelTitle}>Observatory</h2>
-          <ObservatoryInfo />
-        </section>
-
-        {/* AllSky Camera */}
-        <section className={styles.panel}>
-          <h2 className={styles.panelTitle}>All-Sky Camera</h2>
-          <div className={styles.imageContainer}>
+          <h2 className={styles.panelTitle}>Radar</h2>
+          <div className={styles.bomImageContainer}>
             <img
-              src={allskyUrl}
-              alt="All-sky view"
-              className={styles.image}
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = "none";
-              }}
+              src={`/api/bom-satellite/IDR691?t=${Math.floor(Date.now() / 60000)}`}
+              alt="BOM Radar"
+              className={styles.bomImage}
             />
           </div>
         </section>
+
+        {/* BOM Satellite Visible */}
+        <section className={styles.panel}>
+          <h2 className={styles.panelTitle}>Satellite (Visible)</h2>
+          <div className={styles.bomImageContainer}>
+            <img
+              src={`/api/bom-satellite/IDE00005?t=${Math.floor(Date.now() / 60000)}`}
+              alt="BOM Satellite Visible"
+              className={styles.bomImage}
+            />
+          </div>
+        </section>
+
+        {/* BOM Satellite Infrared */}
+        <section className={styles.panel}>
+          <h2 className={styles.panelTitle}>Satellite (Infrared)</h2>
+          <div className={styles.bomImageContainer}>
+            <img
+              src={`/api/bom-satellite/IDE00006?t=${Math.floor(Date.now() / 60000)}`}
+              alt="BOM Satellite Infrared"
+              className={styles.bomImage}
+            />
+          </div>
+        </section>
+
+        {/* Row 3: Forecast, Weather Station */}
 
         {/* Clear Outside Forecast */}
         <section className={styles.panel}>
@@ -374,12 +415,6 @@ export default function Dashboard() {
               />
             </div>
           )}
-        </section>
-
-        {/* BOM Satellite Imagery */}
-        <section className={`${styles.panel} ${styles.satellitePanel}`}>
-          <h2 className={styles.panelTitle}>BOM Satellite Imagery</h2>
-          <SatellitePanel />
         </section>
       </main>
 
