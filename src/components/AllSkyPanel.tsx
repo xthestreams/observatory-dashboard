@@ -42,10 +42,22 @@ const DEFAULT_CONFIG: VirtualSkyConfig = {
   scaleY: 1.0,
 };
 
+// Extend jQuery type for VirtualSky
+interface JQueryStatic {
+  virtualsky: (opts: Record<string, unknown>) => unknown;
+}
+
+declare global {
+  interface Window {
+    jQuery?: JQueryStatic;
+    $?: JQueryStatic;
+  }
+}
+
 export default function AllSkyPanel({ imageUrl }: AllSkyPanelProps) {
   const [showOverlay, setShowOverlay] = useState(false);
   const [config, setConfig] = useState<VirtualSkyConfig>(DEFAULT_CONFIG);
-  const [scriptLoaded, setScriptLoaded] = useState(false);
+  const [scriptsLoaded, setScriptsLoaded] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const vsRef = useRef<unknown>(null);
 
@@ -65,44 +77,62 @@ export default function AllSkyPanel({ imageUrl }: AllSkyPanelProps) {
     loadConfig();
   }, []);
 
-  // Load VirtualSky script dynamically
+  // Load jQuery and VirtualSky scripts dynamically
   useEffect(() => {
-    if (scriptLoaded) return;
+    if (scriptsLoaded) return;
 
     // Check if already loaded
-    const win = window as Window & { S?: { virtualsky?: unknown } };
-    if (typeof window !== "undefined" && win.S?.virtualsky) {
-      setScriptLoaded(true);
+    if (typeof window !== "undefined" && window.$ && "virtualsky" in window.$) {
+      setScriptsLoaded(true);
       return;
     }
 
-    const script = document.createElement("script");
-    script.src = "https://slowe.github.io/VirtualSky/virtualsky.min.js";
-    script.async = true;
-    script.onload = () => setScriptLoaded(true);
-    script.onerror = () => console.error("Failed to load VirtualSky");
-    document.head.appendChild(script);
+    // Load jQuery first, then VirtualSky
+    const loadScripts = async () => {
+      // Load jQuery if not present
+      if (!window.jQuery) {
+        await new Promise<void>((resolve, reject) => {
+          const jqueryScript = document.createElement("script");
+          jqueryScript.src = "https://code.jquery.com/jquery-3.7.1.min.js";
+          jqueryScript.async = true;
+          jqueryScript.onload = () => resolve();
+          jqueryScript.onerror = () => reject(new Error("Failed to load jQuery"));
+          document.head.appendChild(jqueryScript);
+        });
+      }
 
-    return () => {
-      // Don't remove script on cleanup - it's cached
+      // Load VirtualSky
+      await new Promise<void>((resolve, reject) => {
+        const vsScript = document.createElement("script");
+        vsScript.src = "https://virtualsky.lco.global/virtualsky.min.js";
+        vsScript.async = true;
+        vsScript.onload = () => resolve();
+        vsScript.onerror = () => reject(new Error("Failed to load VirtualSky"));
+        document.head.appendChild(vsScript);
+      });
+
+      setScriptsLoaded(true);
     };
-  }, [scriptLoaded]);
+
+    loadScripts().catch((err) => console.error(err));
+  }, [scriptsLoaded]);
 
   // Initialize or update VirtualSky when overlay is shown
   useEffect(() => {
-    if (!showOverlay || !scriptLoaded || !containerRef.current) return;
+    if (!showOverlay || !scriptsLoaded || !containerRef.current) return;
 
-    const win = window as Window & { S?: { virtualsky?: (opts: Record<string, unknown>) => unknown } };
-    if (!win.S?.virtualsky) return;
+    if (!window.$ || !window.$.virtualsky) {
+      console.error("VirtualSky not available");
+      return;
+    }
 
     // Clear previous instance
     if (vsRef.current) {
       containerRef.current.innerHTML = "";
     }
 
-    // Create VirtualSky instance
-    const virtualsky = win.S.virtualsky;
-    vsRef.current = virtualsky({
+    // Create VirtualSky instance using jQuery
+    vsRef.current = window.$.virtualsky({
       id: "virtualsky-overlay",
       latitude: siteConfig.latitude,
       longitude: siteConfig.longitude,
@@ -141,7 +171,7 @@ export default function AllSkyPanel({ imageUrl }: AllSkyPanelProps) {
         meridian: "rgba(100,180,255,0.3)",
       },
     });
-  }, [showOverlay, scriptLoaded, config]);
+  }, [showOverlay, scriptsLoaded, config]);
 
   return (
     <div className={styles.container}>
@@ -154,7 +184,7 @@ export default function AllSkyPanel({ imageUrl }: AllSkyPanelProps) {
             (e.target as HTMLImageElement).style.display = "none";
           }}
         />
-        {showOverlay && scriptLoaded && (
+        {showOverlay && scriptsLoaded && (
           <div
             ref={containerRef}
             id="virtualsky-overlay"

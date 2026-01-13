@@ -64,21 +64,46 @@ export default function SetupPage() {
     loadConfig();
   }, []);
 
-  // Load VirtualSky script for preview
+  // Load jQuery and VirtualSky scripts for preview
   useEffect(() => {
     if (scriptLoaded || !previewEnabled) return;
 
-    const win = window as Window & { S?: { virtualsky?: unknown } };
-    if (typeof window !== "undefined" && win.S?.virtualsky) {
+    // Check if already loaded
+    const win = window as Window & { $?: { virtualsky?: unknown } };
+    if (typeof window !== "undefined" && win.$?.virtualsky) {
       setScriptLoaded(true);
       return;
     }
 
-    const script = document.createElement("script");
-    script.src = "https://slowe.github.io/VirtualSky/virtualsky.min.js";
-    script.async = true;
-    script.onload = () => setScriptLoaded(true);
-    document.head.appendChild(script);
+    // Load jQuery first, then VirtualSky
+    const loadScripts = async () => {
+      // Load jQuery if not present
+      const jqueryWin = window as Window & { jQuery?: unknown };
+      if (!jqueryWin.jQuery) {
+        await new Promise<void>((resolve, reject) => {
+          const jqueryScript = document.createElement("script");
+          jqueryScript.src = "https://code.jquery.com/jquery-3.7.1.min.js";
+          jqueryScript.async = true;
+          jqueryScript.onload = () => resolve();
+          jqueryScript.onerror = () => reject(new Error("Failed to load jQuery"));
+          document.head.appendChild(jqueryScript);
+        });
+      }
+
+      // Load VirtualSky
+      await new Promise<void>((resolve, reject) => {
+        const vsScript = document.createElement("script");
+        vsScript.src = "https://virtualsky.lco.global/virtualsky.min.js";
+        vsScript.async = true;
+        vsScript.onload = () => resolve();
+        vsScript.onerror = () => reject(new Error("Failed to load VirtualSky"));
+        document.head.appendChild(vsScript);
+      });
+
+      setScriptLoaded(true);
+    };
+
+    loadScripts().catch((err) => console.error(err));
   }, [previewEnabled, scriptLoaded]);
 
   // Update preview when config changes
@@ -90,11 +115,10 @@ export default function SetupPage() {
 
     container.innerHTML = "";
 
-    const win = window as Window & { S?: { virtualsky?: (opts: Record<string, unknown>) => unknown } };
-    if (!win.S?.virtualsky) return;
+    const win = window as Window & { $?: { virtualsky: (opts: Record<string, unknown>) => unknown } };
+    if (!win.$?.virtualsky) return;
 
-    const virtualsky = win.S.virtualsky;
-    virtualsky({
+    win.$.virtualsky({
       id: "preview-container",
       latitude: siteConfig.latitude,
       longitude: siteConfig.longitude,
