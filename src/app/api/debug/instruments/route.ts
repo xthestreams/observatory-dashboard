@@ -21,11 +21,11 @@ export async function GET() {
     .eq("expected", true);
 
   // Get site_config for collector_last_config
-  const { data: configData, error: configError } = await serviceClient
+  // Use fetchAll and filter in JS to avoid caching issues
+  const { data: allConfig, error: configError } = await serviceClient
     .from("site_config")
-    .select("*")
-    .eq("key", "collector_last_config")
-    .single();
+    .select("*");
+  const configData = (allConfig || []).find(c => c.key === "collector_last_config") || null;
 
   // Also fetch telemetryHealth to compare
   let telemetryHealth = null;
