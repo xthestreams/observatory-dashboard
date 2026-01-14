@@ -70,12 +70,12 @@ export async function POST(request: NextRequest) {
 
     // Mark instruments NOT in this config (but from this collector) as not expected
     // This handles cases where a device was removed from the Pi config
-    if (payload.collector_id) {
+    if (payload.collector_id && expectedCodes.length > 0) {
       const { error: updateError } = await supabase
         .from("instruments")
         .update({ expected: false, updated_at: timestamp })
         .eq("collector_id", payload.collector_id)
-        .not("code", "in", `(${expectedCodes.map(c => `"${c}"`).join(",")})`);
+        .filter("code", "not.in", `(${expectedCodes.join(",")})`);
 
       if (updateError) {
         console.error("Error marking removed instruments:", updateError);
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Store the config push timestamp in site_config for dashboard display
-    await supabase
+    const { error: configError } = await supabase
       .from("site_config")
       .upsert({
         key: "collector_last_config",
@@ -93,7 +93,13 @@ export async function POST(request: NextRequest) {
           timestamp,
         },
         updated_at: timestamp,
+      }, {
+        onConflict: "key",
       });
+
+    if (configError) {
+      console.error("Error storing config timestamp:", configError);
+    }
 
     return NextResponse.json({
       success: true,
