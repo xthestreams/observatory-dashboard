@@ -371,19 +371,14 @@ export async function fetchTelemetryHealth(
   // Filter to only expected instruments in JS
   const instruments = (allInstruments || []).filter(i => i.expected === true);
 
-  console.log("fetchTelemetryHealth: found", instruments.length, "expected instruments (filtered from", allInstruments?.length || 0, "total)");
-  console.log("fetchTelemetryHealth: instrument codes:", instruments.map(i => i.code).join(", "));
-
   // Fetch last config update timestamp
   // Use fetchAll and filter in JS to avoid potential Supabase caching
-  const { data: allConfig, error: configError } = await supabase
+  const { data: allConfig } = await supabase
     .from("site_config")
     .select("key, value");
 
   const configData = (allConfig || []).find(c => c.key === "collector_last_config");
   const lastConfigUpdate = configData?.value?.timestamp || null;
-
-  console.log("fetchTelemetryHealth: lastConfigUpdate:", lastConfigUpdate);
 
   // Compute effective status for each instrument
   const now = Date.now();

@@ -44,9 +44,8 @@ export async function POST(request: NextRequest) {
     const timestamp = new Date().toISOString();
 
     // Mark all instruments from this collector as expected
-    const upsertResults = [];
     for (const inst of payload.instruments) {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from("instruments")
         .upsert({
           code: inst.code,
@@ -62,17 +61,12 @@ export async function POST(request: NextRequest) {
           updated_at: timestamp,
         }, {
           onConflict: "code",
-        })
-        .select("code, expected");
+        });
 
       if (error) {
         console.error(`Error upserting instrument ${inst.code}:`, error);
-        upsertResults.push({ code: inst.code, error: error.message });
-      } else {
-        upsertResults.push({ code: inst.code, success: true, data });
       }
     }
-    console.log("Upsert results:", JSON.stringify(upsertResults));
 
     // Mark instruments NOT in this config as not expected
     // This handles cases where:
@@ -111,8 +105,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Store the config push timestamp in site_config for dashboard display
-    console.log("Attempting site_config upsert with key: collector_last_config");
-    const { data: upsertData, error: configError } = await supabase
+    const { error: configError } = await supabase
       .from("site_config")
       .upsert({
         key: "collector_last_config",
@@ -124,21 +117,16 @@ export async function POST(request: NextRequest) {
         updated_at: timestamp,
       }, {
         onConflict: "key",
-      })
-      .select();
+      });
 
     if (configError) {
       console.error("Error storing config timestamp:", configError);
-    } else {
-      console.log("site_config upsert result:", JSON.stringify(upsertData));
     }
 
     return NextResponse.json({
       success: true,
       timestamp,
       instruments_registered: expectedCodes.length,
-      api_version: "2026-01-14-v3",  // Deployment verification
-      debug_upsert_results: upsertResults,  // For debugging
     });
   } catch (error) {
     console.error("Config ingest error:", error);
