@@ -222,7 +222,14 @@ export default function AllSkyPage() {
                 width: containerSize,
                 height: containerSize,
                 opacity: config.opacity,
-                transform: `translate(-50%, -50%) scale(${config.scaleX}, ${config.scaleY})`,
+                // Use margin-based centering instead of transform translate
+                // to avoid conflicts with VirtualSky's internal positioning
+                marginLeft: -containerSize / 2,
+                marginTop: -containerSize / 2,
+                transform: config.scaleX !== 1 || config.scaleY !== 1
+                  ? `scale(${config.scaleX}, ${config.scaleY})`
+                  : undefined,
+                transformOrigin: "center center",
               }}
             />
           )}

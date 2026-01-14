@@ -91,6 +91,8 @@
   top: 50%;
   left: 50%;
   z-index: 10;
+  /* The transform-origin ensures scaling happens from center */
+  transform-origin: center center;
 }
 
 .loading {
