@@ -971,72 +971,36 @@ def get_collector_id() -> str:
 
 def build_expected_instruments() -> list:
     """
-    Build list of expected instruments from current config.
-    Uses actual instrument codes from data_store when available (e.g., sqm-5028),
-    falls back to IP-based codes for instruments not yet connected.
+    Build list of expected instruments that have actually reported data.
+    Only includes instruments from data_store (i.e., instruments that have
+    successfully connected and sent readings). This avoids registering
+    duplicate IP-based codes when we already have the serial-based code.
     """
     instruments = []
 
     # Get current instrument codes from data_store
+    # These are only instruments that have successfully sent data
     all_data = data_store.get_all()
     known_codes = set(all_data.keys())
 
-    # SQM devices - prefer serial-based codes like sqm-5028
-    for device in CONFIG["sqm_devices"]:
-        ip_code = f"sqm-{device['host'].replace('.', '-')}"
-        # Look for a matching sqm-XXXX code in known instruments
-        actual_code = None
-        for code in known_codes:
-            if code.startswith("sqm-") and code not in [ip_code] and not code.startswith("sqm-192"):
-                # Check if this might be our device (can't know for certain without tracking)
-                # For now, just use known serial-based codes
-                pass
-        # Use IP-based code as fallback
-        instruments.append({
-            "code": ip_code,
-            "type": "sqm",
-            "host": device["host"],
-            "slot": device["slot"],
-        })
-
-    # Davis WeatherLink devices - prefer lsid-based codes like davis-763610
-    for device in CONFIG["davis_devices"]:
-        ip_code = f"davis-{device['host'].replace('.', '-')}"
-        instruments.append({
-            "code": ip_code,
-            "type": "weather_station",
-            "host": device["host"],
-            "slot": device["slot"],
-        })
-
-    # Cloudwatcher devices - use IP-based codes (no serial available)
-    for device in CONFIG["cloudwatcher_devices"]:
-        instruments.append({
-            "code": f"cw-{device['host'].replace('.', '-')}",
-            "type": "cloudwatcher",
-            "host": device["host"],
-            "slot": device["slot"],
-        })
-
-    # Also include all instruments that have reported data
-    # This catches instruments with serial/lsid-based codes
+    # Only register instruments that have reported data
     for code in known_codes:
-        if not any(i["code"] == code for i in instruments):
-            # Infer type from code prefix
-            if code.startswith("sqm-"):
-                inst_type = "sqm"
-            elif code.startswith("davis-"):
-                inst_type = "weather_station"
-            elif code.startswith("cw-"):
-                inst_type = "cloudwatcher"
-            else:
-                inst_type = "unknown"
-            instruments.append({
-                "code": code,
-                "type": inst_type,
-                "host": "auto-detected",
-                "slot": 0,
-            })
+        # Infer type from code prefix
+        if code.startswith("sqm-"):
+            inst_type = "sqm"
+        elif code.startswith("davis-"):
+            inst_type = "weather_station"
+        elif code.startswith("cw-"):
+            inst_type = "cloudwatcher"
+        else:
+            inst_type = "unknown"
+
+        instruments.append({
+            "code": code,
+            "type": inst_type,
+            "host": "auto-detected",
+            "slot": 0,
+        })
 
     return instruments
 

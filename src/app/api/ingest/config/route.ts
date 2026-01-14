@@ -44,8 +44,9 @@ export async function POST(request: NextRequest) {
     const timestamp = new Date().toISOString();
 
     // Mark all instruments from this collector as expected
+    const upsertResults = [];
     for (const inst of payload.instruments) {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("instruments")
         .upsert({
           code: inst.code,
@@ -61,12 +62,17 @@ export async function POST(request: NextRequest) {
           updated_at: timestamp,
         }, {
           onConflict: "code",
-        });
+        })
+        .select("code, expected");
 
       if (error) {
         console.error(`Error upserting instrument ${inst.code}:`, error);
+        upsertResults.push({ code: inst.code, error: error.message });
+      } else {
+        upsertResults.push({ code: inst.code, success: true, data });
       }
     }
+    console.log("Upsert results:", JSON.stringify(upsertResults));
 
     // Mark instruments NOT in this config as not expected
     // This handles cases where:
@@ -131,7 +137,8 @@ export async function POST(request: NextRequest) {
       success: true,
       timestamp,
       instruments_registered: expectedCodes.length,
-      api_version: "2026-01-14-v2",  // Deployment verification
+      api_version: "2026-01-14-v3",  // Deployment verification
+      debug_upsert_results: upsertResults,  // For debugging
     });
   } catch (error) {
     console.error("Config ingest error:", error);
