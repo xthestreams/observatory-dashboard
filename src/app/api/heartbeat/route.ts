@@ -3,21 +3,29 @@ import { updateHeartbeat, getTelemetryHealth, getDebugState } from "@/lib/teleme
 
 export const dynamic = "force-dynamic";
 
+interface InstrumentHealth {
+  status: "HEALTHY" | "DEGRADED" | "OFFLINE";
+  failure_rate: number;
+}
+
 interface HeartbeatPayload {
   instruments: string[];  // List of instrument codes the collector is monitoring
+  instrument_health: Record<string, InstrumentHealth>;  // Health status per instrument
   collector_version?: string;
   uptime_seconds?: number;
 }
 
 /**
  * POST /api/heartbeat
- * Receives heartbeat from Pi collector to indicate it's alive and what instruments it's monitoring.
- * Updates Vercel KV state (no Supabase needed for health checks).
+ * Receives heartbeat from Pi collector with instrument health statuses.
  *
- * This allows us to distinguish:
- * - Collector down (no heartbeat)
- * - Data flow blocked (heartbeat OK but no readings)
- * - All working (heartbeat OK and readings OK)
+ * The collector is the source of truth for instrument health. It tracks
+ * success/failure rates and reports:
+ * - HEALTHY: < 20% failure rate
+ * - DEGRADED: 20-80% failure rate
+ * - OFFLINE: > 80% failure rate
+ *
+ * The server stores this data in KV and the dashboard displays it directly.
  */
 export async function POST(request: NextRequest) {
   // Verify API key from Raspberry Pi
@@ -40,9 +48,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Update KV state (primary source of truth for health)
+    // Update KV state with collector-reported health
     await updateHeartbeat({
       instruments: data.instruments,
+      instrument_health: data.instrument_health || {},
       collector_version: data.collector_version,
       uptime_seconds: data.uptime_seconds,
     });

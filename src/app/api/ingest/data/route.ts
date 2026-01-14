@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase";
-import { getOrCreateInstrument, inferInstrumentType } from "@/lib/instruments";
-import { updateInstrumentReading, ReadingValues } from "@/lib/telemetryKV";
+import { getOrCreateInstrument } from "@/lib/instruments";
 import { IngestPayload } from "@/types/weather";
 
 export async function POST(request: NextRequest) {
@@ -57,41 +56,13 @@ export async function POST(request: NextRequest) {
       .from("instrument_readings")
       .insert(readingRecord);
 
-    // Prepare reading values for in-memory state
-    const readingValues: ReadingValues = {
-      temperature: data.temperature ?? null,
-      humidity: data.humidity ?? null,
-      pressure: data.pressure ?? null,
-      dewpoint: data.dewpoint ?? null,
-      wind_speed: data.wind_speed ?? null,
-      wind_gust: data.wind_gust ?? null,
-      wind_direction: data.wind_direction ?? null,
-      rain_rate: data.rain_rate ?? null,
-      sky_temp: data.sky_temp ?? null,
-      ambient_temp: data.ambient_temp ?? null,
-      sky_quality: data.sky_quality ?? null,
-      sqm_temperature: data.sqm_temperature ?? null,
-      cloud_condition: data.cloud_condition ?? null,
-      rain_condition: data.rain_condition ?? null,
-      wind_condition: data.wind_condition ?? null,
-      day_condition: data.day_condition ?? null,
-    };
-
-    // Infer instrument type for in-memory state
-    const instrumentType = inferInstrumentType(data);
-
     if (readingError) {
       console.error("Error inserting instrument reading:", readingError);
-      // Still update KV state so dashboard can show data even when Supabase is blocked
-      await updateInstrumentReading(instrumentCode, instrumentCode, instrumentType, readingValues, false);
       return NextResponse.json(
         { error: "Failed to insert instrument reading" },
         { status: 500 }
       );
     }
-
-    // Update KV telemetry state (for health checks and data display without Supabase)
-    await updateInstrumentReading(instrumentCode, instrumentCode, instrumentType, readingValues, readingRecord.is_outlier);
 
     // Update the instrument's last_reading_at timestamp
     const { error: updateError } = await supabase

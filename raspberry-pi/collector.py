@@ -96,6 +96,86 @@ logger = logging.getLogger("observatory-collector")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# INSTRUMENT HEALTH TRACKER
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class InstrumentHealthTracker:
+    """
+    Tracks success/failure rate for each instrument over a sliding window.
+
+    Health status thresholds:
+    - HEALTHY: < 20% failure rate (default, not explicitly sent)
+    - DEGRADED: 20-80% failure rate
+    - OFFLINE: > 80% failure rate
+    """
+
+    WINDOW_SIZE = 10  # Track last 10 readings
+    DEGRADED_THRESHOLD = 0.2  # 20% failures = degraded
+    OFFLINE_THRESHOLD = 0.8   # 80% failures = offline
+
+    def __init__(self):
+        self._history: Dict[str, list] = {}  # code -> list of booleans (True=success)
+        self._lock = threading.Lock()
+
+    def record_success(self, instrument_code: str) -> None:
+        """Record a successful reading for an instrument."""
+        with self._lock:
+            if instrument_code not in self._history:
+                self._history[instrument_code] = []
+            self._history[instrument_code].append(True)
+            # Keep only last WINDOW_SIZE readings
+            self._history[instrument_code] = self._history[instrument_code][-self.WINDOW_SIZE:]
+
+    def record_failure(self, instrument_code: str) -> None:
+        """Record a failed reading for an instrument."""
+        with self._lock:
+            if instrument_code not in self._history:
+                self._history[instrument_code] = []
+            self._history[instrument_code].append(False)
+            # Keep only last WINDOW_SIZE readings
+            self._history[instrument_code] = self._history[instrument_code][-self.WINDOW_SIZE:]
+
+    def get_status(self, instrument_code: str) -> str:
+        """
+        Get health status for an instrument.
+        Returns: "HEALTHY", "DEGRADED", or "OFFLINE"
+        """
+        with self._lock:
+            history = self._history.get(instrument_code, [])
+
+            if not history:
+                return "HEALTHY"  # No data yet, assume healthy
+
+            failure_count = sum(1 for success in history if not success)
+            failure_rate = failure_count / len(history)
+
+            if failure_rate >= self.OFFLINE_THRESHOLD:
+                return "OFFLINE"
+            elif failure_rate >= self.DEGRADED_THRESHOLD:
+                return "DEGRADED"
+            else:
+                return "HEALTHY"
+
+    def get_all_statuses(self) -> Dict[str, str]:
+        """Get health status for all tracked instruments."""
+        with self._lock:
+            return {code: self.get_status(code) for code in self._history.keys()}
+
+    def get_failure_rate(self, instrument_code: str) -> float:
+        """Get failure rate for an instrument (0.0 to 1.0)."""
+        with self._lock:
+            history = self._history.get(instrument_code, [])
+            if not history:
+                return 0.0
+            failure_count = sum(1 for success in history if not success)
+            return failure_count / len(history)
+
+
+# Global health tracker
+health_tracker = InstrumentHealthTracker()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # MULTI-INSTRUMENT DATA STORE
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -435,15 +515,22 @@ def read_sqm_device(device_config: dict):
                                 sky_quality=sqm_value,
                                 sqm_temperature=sqm_temp,
                             )
+                            health_tracker.record_success(instrument_code)
                             logger.debug(f"SQM [{instrument_code}]: {sqm_value} mag/arcsec², temp={sqm_temp}°C")
+                    else:
+                        # Invalid response format
+                        health_tracker.record_failure(instrument_code)
+                        logger.warning(f"SQM [{instrument_code}]: invalid response: {response_str[:50]}")
 
                     time.sleep(60)
 
         except (socket.error, ConnectionError) as e:
             logger.error(f"SQM {host} connection error: {e}")
+            health_tracker.record_failure(instrument_code)
             time.sleep(60)
         except Exception as e:
             logger.error(f"SQM {host} error: {e}")
+            health_tracker.record_failure(instrument_code)
             time.sleep(60)
 
 
@@ -557,11 +644,18 @@ def read_weatherlink_device(device_config: dict):
             if updates:
                 logger.info(f"WeatherLink [{instrument_code}]: {updates}")
                 data_store.update(instrument_code, **updates)
+                health_tracker.record_success(instrument_code)
+            else:
+                # No data in response
+                health_tracker.record_failure(instrument_code)
+                logger.warning(f"WeatherLink [{instrument_code}]: no data in response")
 
         except requests.RequestException as e:
             logger.error(f"WeatherLink {host} request error: {e}")
+            health_tracker.record_failure(instrument_code)
         except Exception as e:
             logger.error(f"WeatherLink {host} error: {e}")
+            health_tracker.record_failure(instrument_code)
 
         time.sleep(interval)
 
@@ -673,11 +767,18 @@ def read_cloudwatcher_device(device_config: dict):
             if updates:
                 logger.info(f"Cloudwatcher CGI [{instrument_code}]: {updates}")
                 data_store.update(instrument_code, **updates)
+                health_tracker.record_success(instrument_code)
+            else:
+                # No data parsed from response
+                health_tracker.record_failure(instrument_code)
+                logger.warning(f"Cloudwatcher [{instrument_code}]: no data in response")
 
         except requests.RequestException as e:
             logger.error(f"Cloudwatcher {host} CGI request error: {e}")
+            health_tracker.record_failure(instrument_code)
         except Exception as e:
             logger.error(f"Cloudwatcher {host} CGI error: {e}")
+            health_tracker.record_failure(instrument_code)
 
         time.sleep(interval)
 
@@ -1074,14 +1175,15 @@ COLLECTOR_VERSION = "2.0.0"
 
 def push_heartbeat():
     """
-    Send periodic heartbeat to the server.
-    This is separate from data push and config push - it's a lightweight
-    signal that the collector process is alive and what instruments it's monitoring.
+    Send periodic heartbeat to the server with instrument health statuses.
 
-    The server can use this to distinguish:
-    - Collector down (no heartbeat)
-    - Data flow blocked (heartbeat OK but no readings in DB)
-    - All working (heartbeat OK and readings OK)
+    The heartbeat includes:
+    - List of instruments the collector is monitoring
+    - Health status for each instrument (HEALTHY, DEGRADED, OFFLINE)
+    - Collector version and uptime
+
+    The server uses this as the source of truth for instrument health.
+    It no longer computes health from staleness - it trusts the collector.
     """
     api_url = CONFIG["remote_api"]
     api_key = CONFIG["api_key"]
@@ -1113,10 +1215,20 @@ def push_heartbeat():
                 if data.get("timestamp")
             ]
 
+            # Get health status for each instrument from the health tracker
+            instrument_health = {}
+            for code in active_instruments:
+                status = health_tracker.get_status(code)
+                instrument_health[code] = {
+                    "status": status,
+                    "failure_rate": health_tracker.get_failure_rate(code),
+                }
+
             uptime_seconds = int(time.time() - COLLECTOR_START_TIME)
 
             payload = {
                 "instruments": active_instruments,
+                "instrument_health": instrument_health,
                 "collector_version": COLLECTOR_VERSION,
                 "uptime_seconds": uptime_seconds,
             }
@@ -1129,7 +1241,11 @@ def push_heartbeat():
             )
 
             if response.ok:
-                logger.debug(f"Heartbeat sent: {len(active_instruments)} instruments, uptime={uptime_seconds}s")
+                # Log health summary
+                degraded = [c for c, h in instrument_health.items() if h["status"] == "DEGRADED"]
+                offline = [c for c, h in instrument_health.items() if h["status"] == "OFFLINE"]
+                healthy = len(active_instruments) - len(degraded) - len(offline)
+                logger.debug(f"Heartbeat sent: {healthy} healthy, {len(degraded)} degraded, {len(offline)} offline")
             else:
                 logger.warning(f"Heartbeat failed: {response.status_code}")
 
