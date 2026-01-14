@@ -215,19 +215,28 @@ export async function fetchLatestInstrumentReadings(
   }
 
   console.log("Found instruments:", instruments?.length || 0);
+  console.log("Instrument codes:", instruments?.map(i => i.code).join(", "));
 
   const readings: Record<string, InstrumentReading> = {};
 
   // For each instrument, get its latest reading
   for (const inst of instruments || []) {
-    const { data: readingArray } = await supabase
+    const { data: readingArray, error: readingError } = await supabase
       .from("instrument_readings")
       .select("*")
       .eq("instrument_id", inst.id)
       .order("created_at", { ascending: false })
       .limit(1);
 
+    if (readingError) {
+      console.error(`Error fetching reading for ${inst.code}:`, readingError);
+      continue;
+    }
+
     const reading = readingArray?.[0];
+    if (!reading) {
+      console.log(`No reading found for instrument ${inst.code} (id: ${inst.id})`);
+    }
     if (reading) {
       // Compute effective status based on staleness
       const effectiveStatus = computeEffectiveStatus(
