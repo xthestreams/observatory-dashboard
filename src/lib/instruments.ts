@@ -375,16 +375,15 @@ export async function fetchTelemetryHealth(
   console.log("fetchTelemetryHealth: instrument codes:", instruments.map(i => i.code).join(", "));
 
   // Fetch last config update timestamp
-  const { data: configData, error: configError } = await supabase
+  // Use fetchAll and filter in JS to avoid potential Supabase caching
+  const { data: allConfig, error: configError } = await supabase
     .from("site_config")
-    .select("value")
-    .eq("key", "collector_last_config")
-    .single();
+    .select("key, value");
 
-  console.log("fetchTelemetryHealth: configData:", JSON.stringify(configData));
-  console.log("fetchTelemetryHealth: configError:", configError?.message || "none");
-
+  const configData = (allConfig || []).find(c => c.key === "collector_last_config");
   const lastConfigUpdate = configData?.value?.timestamp || null;
+
+  console.log("fetchTelemetryHealth: lastConfigUpdate:", lastConfigUpdate);
 
   // Compute effective status for each instrument
   const now = Date.now();
