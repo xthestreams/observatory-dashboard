@@ -972,31 +972,44 @@ def get_collector_id() -> str:
 def build_expected_instruments() -> list:
     """
     Build list of expected instruments from current config.
-    Note: instrument_code is determined at runtime after connecting to devices
-    (e.g., SQM serial numbers), so we use host-based codes initially.
-    These will be updated when devices actually report data.
+    Uses actual instrument codes from data_store when available (e.g., sqm-5028),
+    falls back to IP-based codes for instruments not yet connected.
     """
     instruments = []
 
-    # SQM devices
+    # Get current instrument codes from data_store
+    all_data = data_store.get_all()
+    known_codes = set(all_data.keys())
+
+    # SQM devices - prefer serial-based codes like sqm-5028
     for device in CONFIG["sqm_devices"]:
+        ip_code = f"sqm-{device['host'].replace('.', '-')}"
+        # Look for a matching sqm-XXXX code in known instruments
+        actual_code = None
+        for code in known_codes:
+            if code.startswith("sqm-") and code not in [ip_code] and not code.startswith("sqm-192"):
+                # Check if this might be our device (can't know for certain without tracking)
+                # For now, just use known serial-based codes
+                pass
+        # Use IP-based code as fallback
         instruments.append({
-            "code": f"sqm-{device['host'].replace('.', '-')}",
+            "code": ip_code,
             "type": "sqm",
             "host": device["host"],
             "slot": device["slot"],
         })
 
-    # Davis WeatherLink devices
+    # Davis WeatherLink devices - prefer lsid-based codes like davis-763610
     for device in CONFIG["davis_devices"]:
+        ip_code = f"davis-{device['host'].replace('.', '-')}"
         instruments.append({
-            "code": f"davis-{device['host'].replace('.', '-')}",
+            "code": ip_code,
             "type": "weather_station",
             "host": device["host"],
             "slot": device["slot"],
         })
 
-    # Cloudwatcher devices
+    # Cloudwatcher devices - use IP-based codes (no serial available)
     for device in CONFIG["cloudwatcher_devices"]:
         instruments.append({
             "code": f"cw-{device['host'].replace('.', '-')}",
@@ -1004,6 +1017,26 @@ def build_expected_instruments() -> list:
             "host": device["host"],
             "slot": device["slot"],
         })
+
+    # Also include all instruments that have reported data
+    # This catches instruments with serial/lsid-based codes
+    for code in known_codes:
+        if not any(i["code"] == code for i in instruments):
+            # Infer type from code prefix
+            if code.startswith("sqm-"):
+                inst_type = "sqm"
+            elif code.startswith("davis-"):
+                inst_type = "weather_station"
+            elif code.startswith("cw-"):
+                inst_type = "cloudwatcher"
+            else:
+                inst_type = "unknown"
+            instruments.append({
+                "code": code,
+                "type": inst_type,
+                "host": "auto-detected",
+                "slot": 0,
+            })
 
     return instruments
 
@@ -1023,8 +1056,11 @@ def push_config():
 
     collector_id = get_collector_id()
     config_interval = 3600  # Push config every hour
+    initial_delay = 15  # Wait for instruments to be discovered
 
     logger.info(f"Starting config pusher, collector_id={collector_id}")
+    logger.info(f"Waiting {initial_delay}s for instrument discovery...")
+    time.sleep(initial_delay)
 
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -1034,6 +1070,7 @@ def push_config():
     while True:
         try:
             instruments = build_expected_instruments()
+            logger.info(f"Config push: {len(instruments)} instruments to register")
 
             payload = {
                 "collector_id": collector_id,

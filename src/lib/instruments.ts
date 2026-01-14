@@ -368,12 +368,18 @@ export async function fetchTelemetryHealth(
     throw instError;
   }
 
+  console.log("fetchTelemetryHealth: found", instruments?.length || 0, "expected instruments");
+  console.log("fetchTelemetryHealth: instrument codes:", instruments?.map(i => i.code).join(", "));
+
   // Fetch last config update timestamp
-  const { data: configData } = await supabase
+  const { data: configData, error: configError } = await supabase
     .from("site_config")
     .select("value")
     .eq("key", "collector_last_config")
     .single();
+
+  console.log("fetchTelemetryHealth: configData:", JSON.stringify(configData));
+  console.log("fetchTelemetryHealth: configError:", configError?.message || "none");
 
   const lastConfigUpdate = configData?.value?.timestamp || null;
 
