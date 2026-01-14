@@ -357,19 +357,22 @@ export function getStatusIcon(status: InstrumentStatus): string {
 export async function fetchTelemetryHealth(
   supabase: SupabaseClient
 ): Promise<TelemetryHealth> {
-  // Fetch all expected instruments
-  const { data: instruments, error: instError } = await supabase
+  // Fetch all instruments and filter in JS to avoid potential caching issues
+  const { data: allInstruments, error: instError } = await supabase
     .from("instruments")
     .select("code, name, status, last_reading_at, consecutive_outliers, expected")
-    .eq("expected", true);
+    .order("updated_at", { ascending: false });
 
   if (instError) {
     console.error("Error fetching instruments for health:", instError);
     throw instError;
   }
 
-  console.log("fetchTelemetryHealth: found", instruments?.length || 0, "expected instruments");
-  console.log("fetchTelemetryHealth: instrument codes:", instruments?.map(i => i.code).join(", "));
+  // Filter to only expected instruments in JS
+  const instruments = (allInstruments || []).filter(i => i.expected === true);
+
+  console.log("fetchTelemetryHealth: found", instruments.length, "expected instruments (filtered from", allInstruments?.length || 0, "total)");
+  console.log("fetchTelemetryHealth: instrument codes:", instruments.map(i => i.code).join(", "));
 
   // Fetch last config update timestamp
   const { data: configData, error: configError } = await supabase
