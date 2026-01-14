@@ -204,74 +204,64 @@ function computeEffectiveStatus(
 export async function fetchLatestInstrumentReadings(
   supabase: SupabaseClient
 ): Promise<Record<string, InstrumentReading>> {
-  // Get all instruments with their latest reading
-  const { data: instruments, error: instError } = await supabase
-    .from("instruments")
-    .select("*");
+  // Get all instruments with their latest readings using a JOIN
+  // This is more efficient than querying each instrument individually
+  const { data: allReadings, error: readingsError } = await supabase
+    .from("instrument_readings")
+    .select(`
+      *,
+      instruments!inner(id, code, name, instrument_type, status)
+    `)
+    .order("created_at", { ascending: false });
 
-  if (instError) {
-    console.error("Error fetching instruments:", instError);
-    throw instError;
+  if (readingsError) {
+    console.error("Error fetching instrument readings:", readingsError);
+    throw readingsError;
   }
 
-  console.log("Found instruments:", instruments?.length || 0);
-  console.log("Instrument codes:", instruments?.map(i => i.code).join(", "));
-
+  // Group by instrument and take the latest reading for each
   const readings: Record<string, InstrumentReading> = {};
+  const seenInstruments = new Set<string>();
 
-  // For each instrument, get its latest reading
-  for (const inst of instruments || []) {
-    const { data: readingArray, error: readingError } = await supabase
-      .from("instrument_readings")
-      .select("*")
-      .eq("instrument_id", inst.id)
-      .order("created_at", { ascending: false })
-      .limit(1);
-
-    if (readingError) {
-      console.error(`Error fetching reading for ${inst.code}:`, readingError);
+  for (const row of allReadings || []) {
+    const inst = row.instruments;
+    if (!inst || seenInstruments.has(inst.code)) {
       continue;
     }
+    seenInstruments.add(inst.code);
 
-    const reading = readingArray?.[0];
-    if (!reading) {
-      console.log(`No reading found for instrument ${inst.code} (id: ${inst.id})`);
-    }
-    if (reading) {
-      // Compute effective status based on staleness
-      const effectiveStatus = computeEffectiveStatus(
-        inst.status,
-        reading.created_at
-      );
+    // Compute effective status based on staleness
+    const effectiveStatus = computeEffectiveStatus(inst.status, row.created_at);
 
-      readings[inst.code] = {
-        instrumentId: inst.id,
-        instrumentCode: inst.code,
-        instrumentName: inst.name,
-        instrumentType: inst.instrument_type as InstrumentType,
-        status: effectiveStatus,
-        isOutlier: reading.is_outlier,
-        outlierReason: reading.outlier_reason,
-        lastReadingAt: reading.created_at,
-        temperature: reading.temperature,
-        humidity: reading.humidity,
-        pressure: reading.pressure,
-        dewpoint: reading.dewpoint,
-        wind_speed: reading.wind_speed,
-        wind_gust: reading.wind_gust,
-        wind_direction: reading.wind_direction,
-        rain_rate: reading.rain_rate,
-        sky_temp: reading.sky_temp,
-        ambient_temp: reading.ambient_temp,
-        sky_quality: reading.sky_quality,
-        sqm_temperature: reading.sqm_temperature,
-        cloud_condition: reading.cloud_condition,
-        rain_condition: reading.rain_condition,
-        wind_condition: reading.wind_condition,
-        day_condition: reading.day_condition,
-      };
-    }
+    readings[inst.code] = {
+      instrumentId: inst.id,
+      instrumentCode: inst.code,
+      instrumentName: inst.name,
+      instrumentType: inst.instrument_type as InstrumentType,
+      status: effectiveStatus,
+      isOutlier: row.is_outlier,
+      outlierReason: row.outlier_reason,
+      lastReadingAt: row.created_at,
+      temperature: row.temperature,
+      humidity: row.humidity,
+      pressure: row.pressure,
+      dewpoint: row.dewpoint,
+      wind_speed: row.wind_speed,
+      wind_gust: row.wind_gust,
+      wind_direction: row.wind_direction,
+      rain_rate: row.rain_rate,
+      sky_temp: row.sky_temp,
+      ambient_temp: row.ambient_temp,
+      sky_quality: row.sky_quality,
+      sqm_temperature: row.sqm_temperature,
+      cloud_condition: row.cloud_condition,
+      rain_condition: row.rain_condition,
+      wind_condition: row.wind_condition,
+      day_condition: row.day_condition,
+    };
   }
+
+  console.log("Found readings for instruments:", Object.keys(readings).join(", "));
 
   return readings;
 }
