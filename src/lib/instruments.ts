@@ -207,10 +207,14 @@ export async function fetchLatestInstrumentReadings(
 ): Promise<Record<string, InstrumentReading>> {
   // Get all instruments with their latest readings using a JOIN
   // This is more efficient than querying each instrument individually
+  // NOTE: Must explicitly select 'id' to avoid Supabase/PostgREST bug returning phantom rows
   const { data: allReadings, error: readingsError } = await supabase
     .from("instrument_readings")
     .select(`
-      *,
+      id, instrument_id, created_at, is_outlier, outlier_reason,
+      temperature, humidity, pressure, dewpoint, wind_speed, wind_gust,
+      wind_direction, rain_rate, sky_temp, ambient_temp, sky_quality,
+      sqm_temperature, cloud_condition, rain_condition, wind_condition, day_condition,
       instruments!inner(id, code, name, instrument_type, status)
     `)
     .order("created_at", { ascending: false });
@@ -225,7 +229,8 @@ export async function fetchLatestInstrumentReadings(
   const seenInstruments = new Set<string>();
 
   for (const row of allReadings || []) {
-    const inst = row.instruments;
+    // With !inner join, instruments is a single object but TypeScript may infer as array
+    const inst = row.instruments as unknown as { id: string; code: string; name: string; instrument_type: string; status: string } | null;
     if (!inst || seenInstruments.has(inst.code)) {
       continue;
     }
@@ -358,9 +363,12 @@ export async function fetchTelemetryHealth(
   supabase: SupabaseClient
 ): Promise<TelemetryHealth> {
   // Fetch all instruments and filter in JS to avoid potential caching issues
+  // NOTE: Must include 'id' column to avoid Supabase/PostgREST bug returning duplicate rows
+  // Add a cache-busting filter to force fresh data
   const { data: allInstruments, error: instError } = await supabase
     .from("instruments")
-    .select("code, name, status, last_reading_at, consecutive_outliers, expected")
+    .select("id, code, name, status, last_reading_at, consecutive_outliers, expected")
+    .gte("created_at", "1970-01-01")  // Always true, but forces fresh query
     .order("updated_at", { ascending: false });
 
   if (instError) {
@@ -368,7 +376,7 @@ export async function fetchTelemetryHealth(
     throw instError;
   }
 
-  // Filter to only expected instruments in JS
+  // Filter to only expected instruments
   const instruments = (allInstruments || []).filter(i => i.expected === true);
 
   // Fetch last config update timestamp

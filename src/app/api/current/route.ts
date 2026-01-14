@@ -18,11 +18,14 @@ export async function GET() {
     // Using direct query instead of view due to potential schema cache issues
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
 
+    // NOTE: Must include 'id' in instruments join to avoid Supabase/PostgREST bug
     const { data: latestReadings, error: readingsError } = await supabase
       .from("instrument_readings")
       .select(`
-        *,
-        instruments!inner(code, include_in_average, status)
+        id, instrument_id, created_at, temperature, humidity, pressure, dewpoint,
+        wind_speed, wind_gust, wind_direction, rain_rate, sky_temp, ambient_temp,
+        sky_quality, sqm_temperature, cloud_condition, rain_condition, wind_condition, day_condition,
+        instruments!inner(id, code, include_in_average, status)
       `)
       .gte("created_at", tenMinutesAgo)
       .eq("is_outlier", false)
@@ -37,7 +40,9 @@ export async function GET() {
       // Get the latest reading per instrument
       const latestByInstrument = new Map<string, typeof latestReadings[0]>();
       for (const r of latestReadings) {
-        const code = r.instruments?.code;
+        // With !inner join, instruments is a single object but TypeScript infers as array
+        const inst = r.instruments as unknown as { id: string; code: string; include_in_average: boolean; status: string } | null;
+        const code = inst?.code;
         if (code && !latestByInstrument.has(code)) {
           latestByInstrument.set(code, r);
         }
