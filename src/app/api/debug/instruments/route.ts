@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase";
+import { fetchTelemetryHealth } from "@/lib/instruments";
 
 export const dynamic = "force-dynamic";
 
@@ -19,11 +20,22 @@ export async function GET() {
     .eq("key", "collector_last_config")
     .single();
 
+  // Also fetch telemetryHealth to compare
+  let telemetryHealth = null;
+  let telemetryError = null;
+  try {
+    telemetryHealth = await fetchTelemetryHealth(supabase);
+  } catch (e) {
+    telemetryError = (e as Error).message;
+  }
+
   return NextResponse.json({
     instruments: instruments || [],
     instruments_error: instError?.message || null,
     config: configData || null,
     config_error: configError?.message || null,
     expected_count: (instruments || []).filter(i => i.expected === true).length,
+    telemetryHealth,
+    telemetryError,
   });
 }
