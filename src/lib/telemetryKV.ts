@@ -244,9 +244,15 @@ async function flushToKV(): Promise<void> {
  */
 export async function getTelemetryHealth(): Promise<TelemetryHealth> {
   // Return cached result if within rate limit window
+  // But still merge with any pending local state (which may be more recent)
   if (!canReadFromKV() && localCache.cachedHealth) {
-    // Update with any pending local state
-    return mergeLocalStateIntoHealth(localCache.cachedHealth);
+    // Use empty map for redis states since we're using cached health
+    // The merge function will rebuild with local pending data if available
+    return mergeLocalStateIntoHealth(
+      localCache.cachedHealth,
+      new Map(),  // No fresh Redis data
+      localCache.cachedHealth.collectorHeartbeat?.instruments || []
+    );
   }
 
   try {
@@ -280,18 +286,18 @@ export async function getTelemetryHealth(): Promise<TelemetryHealth> {
     // Update last read time
     localCache.lastReadTime = Date.now();
 
-    // Build health status
+    // Build health status from Redis data
     const health = buildHealthStatus(
       heartbeat || localCache.pendingHeartbeat,
       instrumentStates,
       instrumentCodes as string[]
     );
 
-    // Cache the result
+    // Cache the result (before merging local state)
     localCache.cachedHealth = health;
 
-    // Merge any pending local state
-    return mergeLocalStateIntoHealth(health);
+    // Merge any pending local state (may have more recent data)
+    return mergeLocalStateIntoHealth(health, instrumentStates, instrumentCodes as string[]);
   } catch (error) {
     console.error("Error reading from Redis:", error);
 
@@ -465,11 +471,18 @@ function buildHealthStatus(
 
 /**
  * Merge pending local state into health result
+ * This is critical for when we have fresh local data but rate-limited Redis reads
  */
-function mergeLocalStateIntoHealth(health: TelemetryHealth): TelemetryHealth {
+function mergeLocalStateIntoHealth(
+  health: TelemetryHealth,
+  redisInstrumentStates: Map<string, InstrumentState>,
+  expectedInstruments: string[]
+): TelemetryHealth {
+  const now = Date.now();
+
   // If we have a more recent pending heartbeat, use it
   if (localCache.pendingHeartbeat) {
-    const pendingAge = Date.now() - localCache.pendingHeartbeat.timestamp;
+    const pendingAge = now - localCache.pendingHeartbeat.timestamp;
     const currentAge = health.collectorHeartbeat?.ageMs ?? Infinity;
 
     if (pendingAge < currentAge) {
@@ -481,12 +494,36 @@ function mergeLocalStateIntoHealth(health: TelemetryHealth): TelemetryHealth {
         uptimeSeconds: localCache.pendingHeartbeat.uptimeSeconds,
         ageMs: pendingAge,
       };
+    }
+  }
 
-      // Update overall status based on new heartbeat
-      if (health.collectorHeartbeat.status === "ok" && health.status === "offline") {
-        health.status = health.offlineInstruments.length > 0 ? "degraded" : "operational";
+  // Merge pending instrument states with Redis states
+  // Local pending data is more recent and should take precedence
+  if (localCache.pendingInstruments.size > 0) {
+    // Create merged map: start with Redis data, overlay local pending data
+    const mergedStates = new Map(redisInstrumentStates);
+    const pendingEntries = Array.from(localCache.pendingInstruments.entries());
+    for (const [code, state] of pendingEntries) {
+      const existingState = mergedStates.get(code);
+      // Use local state if it's more recent
+      if (!existingState || state.lastReadingAt > existingState.lastReadingAt) {
+        mergedStates.set(code, state);
       }
     }
+
+    // Rebuild health status with merged data
+    const pendingKeys = Array.from(localCache.pendingInstruments.keys());
+    const mergedExpected = Array.from(new Set([...expectedInstruments, ...pendingKeys]));
+    return buildHealthStatus(
+      localCache.pendingHeartbeat || (health.collectorHeartbeat ? {
+        timestamp: health.collectorHeartbeat.lastHeartbeat ? new Date(health.collectorHeartbeat.lastHeartbeat).getTime() : 0,
+        instruments: health.collectorHeartbeat.instruments,
+        collectorVersion: health.collectorHeartbeat.collectorVersion,
+        uptimeSeconds: health.collectorHeartbeat.uptimeSeconds,
+      } : null),
+      mergedStates,
+      mergedExpected
+    );
   }
 
   return health;
