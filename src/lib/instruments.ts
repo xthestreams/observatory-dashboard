@@ -169,6 +169,36 @@ export async function fetchFailedInstruments(
 }
 
 /**
+ * Compute effective status based on last reading time
+ * Instruments that haven't reported recently are considered offline
+ */
+function computeEffectiveStatus(
+  dbStatus: string,
+  lastReadingAt: string | null
+): InstrumentStatus {
+  // If already offline or maintenance, keep that status
+  if (dbStatus === "offline" || dbStatus === "maintenance") {
+    return dbStatus as InstrumentStatus;
+  }
+
+  // Check if the instrument has gone stale (no data in last 15 minutes)
+  if (lastReadingAt) {
+    const lastReading = new Date(lastReadingAt).getTime();
+    const now = Date.now();
+    const staleThresholdMs = 15 * 60 * 1000; // 15 minutes
+
+    if (now - lastReading > staleThresholdMs) {
+      return "offline";
+    }
+  } else {
+    // No readings ever recorded - consider offline
+    return "offline";
+  }
+
+  return dbStatus as InstrumentStatus;
+}
+
+/**
  * Fetch latest reading for each instrument
  */
 export async function fetchLatestInstrumentReadings(
@@ -199,12 +229,18 @@ export async function fetchLatestInstrumentReadings(
 
     const reading = readingArray?.[0];
     if (reading) {
+      // Compute effective status based on staleness
+      const effectiveStatus = computeEffectiveStatus(
+        inst.status,
+        reading.created_at
+      );
+
       readings[inst.code] = {
         instrumentId: inst.id,
         instrumentCode: inst.code,
         instrumentName: inst.name,
         instrumentType: inst.instrument_type as InstrumentType,
-        status: inst.status as InstrumentStatus,
+        status: effectiveStatus,
         isOutlier: reading.is_outlier,
         outlierReason: reading.outlier_reason,
         lastReadingAt: reading.created_at,
@@ -245,13 +281,16 @@ export function getInstrumentsForMetric(
 }
 
 /**
- * Count how many instruments measure a specific metric
+ * Count how many ACTIVE instruments measure a specific metric
+ * (excludes offline, degraded, and maintenance instruments)
  */
 export function countInstrumentsForMetric(
   readings: Record<string, InstrumentReading>,
   metric: string
 ): number {
-  return getInstrumentsForMetric(readings, metric).length;
+  return getInstrumentsForMetric(readings, metric).filter(
+    (r) => r.status === "active"
+  ).length;
 }
 
 /**
