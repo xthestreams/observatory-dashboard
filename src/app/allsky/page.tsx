@@ -133,17 +133,6 @@ export default function AllSkyPage() {
     loadScripts().catch((err) => console.error(err));
   }, [scriptsLoaded]);
 
-  // Convert decimal degrees to VirtualSky format (e.g., -31.25 -> "31.25S")
-  const formatLatitude = (lat: number): string => {
-    const abs = Math.abs(lat);
-    return lat >= 0 ? `${abs}N` : `${abs}S`;
-  };
-
-  const formatLongitude = (lon: number): string => {
-    const abs = Math.abs(lon);
-    return lon >= 0 ? `${abs}E` : `${abs}W`;
-  };
-
   // Initialize VirtualSky when scripts are loaded
   useEffect(() => {
     if (!scriptsLoaded || !containerRef.current || !showOverlay || containerSize === 0) return;
@@ -157,12 +146,13 @@ export default function AllSkyPage() {
     containerRef.current.innerHTML = "";
 
     // Create VirtualSky instance using S.virtualsky (stuquery)
+    // VirtualSky expects raw decimal degrees (negative for S lat and W lon)
     vsRef.current = window.S.virtualsky({
       id: "virtualsky-container",
       width: containerSize,
       height: containerSize,
-      latitude: formatLatitude(siteConfig.latitude),
-      longitude: formatLongitude(siteConfig.longitude),
+      latitude: siteConfig.latitude,
+      longitude: siteConfig.longitude,
       az: config.azOffset,
       projection: config.projection,
       constellations: config.showConstellations,

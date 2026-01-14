@@ -105,6 +105,18 @@ export interface FailedInstrument {
 }
 
 /**
+ * Collector heartbeat info
+ */
+export interface CollectorHeartbeat {
+  status: "ok" | "stale" | "unknown";
+  lastHeartbeat: string | null;
+  instruments: string[];  // Instruments the collector is monitoring
+  collectorVersion: string | null;
+  uptimeSeconds: number | null;
+  ageMs: number;  // How old is the heartbeat
+}
+
+/**
  * Overall telemetry health status for the Observatory widget
  */
 export interface TelemetryHealth {
@@ -114,6 +126,8 @@ export interface TelemetryHealth {
   degradedInstruments: FailedInstrument[];
   offlineInstruments: FailedInstrument[];
   lastConfigUpdate: string | null;
+  // Heartbeat info for collector health
+  collectorHeartbeat?: CollectorHeartbeat;
 }
 
 /**

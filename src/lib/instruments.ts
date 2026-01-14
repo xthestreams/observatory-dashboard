@@ -11,6 +11,7 @@ import {
   FailedInstrument,
   InstrumentStatus,
   TelemetryHealth,
+  CollectorHeartbeat,
 } from "@/types/weather";
 
 /**
@@ -358,6 +359,7 @@ export function getStatusIcon(status: InstrumentStatus): string {
 /**
  * Fetch overall telemetry health status
  * Compares expected instruments (from Pi config) against actual status
+ * Now includes collector heartbeat for better diagnostics
  */
 export async function fetchTelemetryHealth(
   supabase: SupabaseClient
@@ -379,14 +381,50 @@ export async function fetchTelemetryHealth(
   // Filter to only expected instruments
   const instruments = (allInstruments || []).filter(i => i.expected === true);
 
-  // Fetch last config update timestamp
+  // Fetch site_config data (config update + heartbeat)
   // Use fetchAll and filter in JS to avoid potential Supabase caching
+  // Add cache-busting filter to force fresh data
   const { data: allConfig } = await supabase
     .from("site_config")
-    .select("key, value");
+    .select("key, value, updated_at")
+    .gte("created_at", "1970-01-01");
 
   const configData = (allConfig || []).find(c => c.key === "collector_last_config");
   const lastConfigUpdate = configData?.value?.timestamp || null;
+
+  // Parse collector heartbeat
+  const heartbeatData = (allConfig || []).find(c => c.key === "collector_heartbeat");
+  let collectorHeartbeat: CollectorHeartbeat = {
+    status: "unknown",
+    lastHeartbeat: null,
+    instruments: [],
+    collectorVersion: null,
+    uptimeSeconds: null,
+    ageMs: Infinity,
+  };
+
+  if (heartbeatData?.value) {
+    const hb = heartbeatData.value as {
+      timestamp?: string;
+      instruments?: string[];
+      collector_version?: string;
+      uptime_seconds?: number;
+    };
+
+    const lastHeartbeatTime = hb.timestamp ? new Date(hb.timestamp).getTime() : 0;
+    const now = Date.now();
+    const ageMs = now - lastHeartbeatTime;
+    const staleThresholdMs = 5 * 60 * 1000; // 5 minutes
+
+    collectorHeartbeat = {
+      status: lastHeartbeatTime === 0 ? "unknown" : (ageMs > staleThresholdMs ? "stale" : "ok"),
+      lastHeartbeat: hb.timestamp || null,
+      instruments: hb.instruments || [],
+      collectorVersion: hb.collector_version || null,
+      uptimeSeconds: hb.uptime_seconds || null,
+      ageMs,
+    };
+  }
 
   // Compute effective status for each instrument
   const now = Date.now();
@@ -445,5 +483,6 @@ export async function fetchTelemetryHealth(
     degradedInstruments,
     offlineInstruments,
     lastConfigUpdate,
+    collectorHeartbeat,
   };
 }

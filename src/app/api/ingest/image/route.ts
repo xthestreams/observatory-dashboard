@@ -54,13 +54,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Also save a timestamped archive copy (for timelapse)
-    const archiveName = `archive/${timestamp.replace(/[:.]/g, "-")}.jpg`;
-    await supabase.storage.from(BUCKET_NAME).upload(archiveName, buffer, {
-      contentType: file.type,
-      upsert: false,
-    });
-
     return NextResponse.json({ success: true, timestamp });
   } catch (error) {
     console.error("Image upload error:", error);

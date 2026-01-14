@@ -3,8 +3,8 @@ import { createServiceClient } from "@/lib/supabase";
 import {
   fetchFailedInstruments,
   fetchLatestInstrumentReadings,
-  fetchTelemetryHealth,
 } from "@/lib/instruments";
+import { getTelemetryHealth, getAggregatedConditions } from "@/lib/telemetryKV";
 import { WeatherData, HistoricalReading, ApiResponse, CloudCondition, RainCondition, WindCondition, DayCondition } from "@/types/weather";
 
 // Force dynamic rendering - this route fetches live data
@@ -16,7 +16,8 @@ export async function GET() {
 
     // Fetch latest readings for site conditions aggregation
     // Using direct query instead of view due to potential schema cache issues
-    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    // Use 15-minute threshold to match KV staleness check in telemetryKV.ts
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
 
     // NOTE: Must include 'id' in instruments join to avoid Supabase/PostgREST bug
     const { data: latestReadings, error: readingsError } = await supabase
@@ -27,7 +28,7 @@ export async function GET() {
         sky_quality, sqm_temperature, cloud_condition, rain_condition, wind_condition, day_condition,
         instruments!inner(id, code, include_in_average, status)
       `)
-      .gte("created_at", tenMinutesAgo)
+      .gte("created_at", fifteenMinutesAgo)
       .eq("is_outlier", false)
       .eq("instruments.status", "active")
       .eq("instruments.include_in_average", true)
@@ -115,6 +116,39 @@ export async function GET() {
           sky_quality: legacyCurrent.sky_quality,
           sqm_temperature: legacyCurrent.sqm_temperature,
           updated_at: legacyCurrent.updated_at || new Date().toISOString(),
+        };
+      }
+    }
+
+    // If still no data from Supabase, try KV aggregated conditions
+    // This allows the dashboard to show data even when Supabase limits are hit
+    if (!current || !current.updated_at) {
+      const memoryConditions = await getAggregatedConditions();
+      if (memoryConditions.updated_at) {
+        const roundOrNull = (val: number | null | undefined, decimals: number): number | null => {
+          if (val === null || val === undefined) return null;
+          const factor = Math.pow(10, decimals);
+          return Math.round(val * factor) / factor;
+        };
+
+        current = {
+          temperature: roundOrNull(memoryConditions.temperature, 1),
+          humidity: roundOrNull(memoryConditions.humidity, 0),
+          pressure: roundOrNull(memoryConditions.pressure, 1),
+          dewpoint: roundOrNull(memoryConditions.dewpoint, 1),
+          wind_speed: roundOrNull(memoryConditions.wind_speed, 1),
+          wind_gust: memoryConditions.wind_gust ?? null,
+          wind_direction: roundOrNull(memoryConditions.wind_direction, 0),
+          rain_rate: memoryConditions.rain_rate ?? null,
+          cloud_condition: (memoryConditions.cloud_condition || "Unknown") as CloudCondition,
+          rain_condition: (memoryConditions.rain_condition || "Unknown") as RainCondition,
+          wind_condition: (memoryConditions.wind_condition || "Unknown") as WindCondition,
+          day_condition: (memoryConditions.day_condition || "Unknown") as DayCondition,
+          sky_temp: roundOrNull(memoryConditions.sky_temp, 1),
+          ambient_temp: roundOrNull(memoryConditions.ambient_temp, 1),
+          sky_quality: roundOrNull(memoryConditions.sky_quality, 2),
+          sqm_temperature: roundOrNull(memoryConditions.sqm_temperature, 1),
+          updated_at: memoryConditions.updated_at,
         };
       }
     }
@@ -219,21 +253,22 @@ export async function GET() {
     // Fetch per-instrument readings for the detail modal
     let instrumentReadings;
     let failedInstruments;
-    let telemetryHealth;
     let instrumentCount = 1;
 
     try {
       instrumentReadings = await fetchLatestInstrumentReadings(supabase);
       failedInstruments = await fetchFailedInstruments(supabase);
-      telemetryHealth = await fetchTelemetryHealth(supabase);
       instrumentCount = Object.keys(instrumentReadings).length || 1;
     } catch (instError) {
       // Instrument tables might not exist yet - that's OK
       console.error("Error fetching instruments (may not exist yet):", instError);
       instrumentReadings = undefined;
       failedInstruments = undefined;
-      telemetryHealth = undefined;
     }
+
+    // Get telemetry health from KV state (no Supabase query needed)
+    // This is updated by heartbeat and ingest endpoints
+    const telemetryHealth = await getTelemetryHealth();
 
     // Build response
     const response: ApiResponse = {

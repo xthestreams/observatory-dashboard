@@ -18,6 +18,7 @@ import {
   SQMGraph,
   AstronomyPanel,
   ObservatoryInfo,
+  WindCompass,
 } from "@/components";
 import InstrumentAlert from "@/components/InstrumentAlert";
 import InstrumentDetailModal from "@/components/InstrumentDetailModal";
@@ -283,6 +284,11 @@ export default function Dashboard() {
                   : undefined
               }
               onClick={() => handleMetricClick("temperature")}
+            />
+            <WindCompass
+              direction={data?.wind_direction ?? null}
+              speed={data?.wind_speed ?? null}
+              gust={data?.wind_gust ?? null}
             />
           </div>
         </section>

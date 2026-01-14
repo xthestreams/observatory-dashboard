@@ -1064,6 +1064,84 @@ def push_config():
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# HEARTBEAT - Lightweight periodic ping to indicate collector is alive
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Track collector start time for uptime calculation
+COLLECTOR_START_TIME = time.time()
+COLLECTOR_VERSION = "2.0.0"
+
+
+def push_heartbeat():
+    """
+    Send periodic heartbeat to the server.
+    This is separate from data push and config push - it's a lightweight
+    signal that the collector process is alive and what instruments it's monitoring.
+
+    The server can use this to distinguish:
+    - Collector down (no heartbeat)
+    - Data flow blocked (heartbeat OK but no readings in DB)
+    - All working (heartbeat OK and readings OK)
+    """
+    api_url = CONFIG["remote_api"]
+    api_key = CONFIG["api_key"]
+
+    if not api_key:
+        logger.warning("No API key, heartbeat disabled")
+        return
+
+    heartbeat_interval = 60  # Send heartbeat every minute
+    initial_delay = 10  # Brief wait for instruments to be discovered
+
+    logger.info(f"Starting heartbeat, interval={heartbeat_interval}s")
+    time.sleep(initial_delay)
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+
+    # Build base URL - remove /ingest suffix to get to /heartbeat
+    base_url = api_url.replace("/ingest", "")
+
+    while True:
+        try:
+            # Get list of instruments that have reported data
+            all_data = data_store.get_all()
+            active_instruments = [
+                code for code, data in all_data.items()
+                if data.get("timestamp")
+            ]
+
+            uptime_seconds = int(time.time() - COLLECTOR_START_TIME)
+
+            payload = {
+                "instruments": active_instruments,
+                "collector_version": COLLECTOR_VERSION,
+                "uptime_seconds": uptime_seconds,
+            }
+
+            response = requests.post(
+                f"{base_url}/heartbeat",
+                json=payload,
+                headers=headers,
+                timeout=10,  # Short timeout for heartbeat
+            )
+
+            if response.ok:
+                logger.debug(f"Heartbeat sent: {len(active_instruments)} instruments, uptime={uptime_seconds}s")
+            else:
+                logger.warning(f"Heartbeat failed: {response.status_code}")
+
+        except requests.RequestException as e:
+            logger.debug(f"Heartbeat error: {e}")  # Debug level - don't spam logs
+        except Exception as e:
+            logger.error(f"Unexpected heartbeat error: {e}")
+
+        time.sleep(heartbeat_interval)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # MAIN
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1127,9 +1205,10 @@ def main():
         )
         threads.append(t)
 
-    # Add data pusher, config pusher, and BOM imagery threads
+    # Add data pusher, config pusher, heartbeat, and BOM imagery threads
     threads.append(threading.Thread(target=push_data, daemon=True, name="pusher"))
     threads.append(threading.Thread(target=push_config, daemon=True, name="config-pusher"))
+    threads.append(threading.Thread(target=push_heartbeat, daemon=True, name="heartbeat"))
     threads.append(threading.Thread(target=push_bom_imagery, daemon=True, name="bom-imagery"))
 
     for t in threads:
