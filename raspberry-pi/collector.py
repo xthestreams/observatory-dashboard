@@ -45,17 +45,32 @@ load_dotenv()
 # CONFIGURATION
 # ═══════════════════════════════════════════════════════════════════════════════
 
+def get_device_configs(device_type: str, max_slots: int = 3) -> list:
+    """
+    Get configured devices for a given type.
+    Returns list of dicts with host, port/interval, and slot number.
+    Only returns slots where host is configured (non-empty).
+    """
+    devices = []
+    for slot in range(1, max_slots + 1):
+        host = os.getenv(f"{device_type}_{slot}_HOST", "")
+        if host:  # Only include if host is configured
+            device = {"host": host, "slot": slot}
+            # Add port for SQM
+            if device_type == "SQM":
+                device["port"] = int(os.getenv(f"{device_type}_{slot}_PORT", "10001"))
+            # Add interval for Davis and Cloudwatcher
+            if device_type in ("DAVIS", "CLOUDWATCHER"):
+                device["interval"] = int(os.getenv(f"{device_type}_{slot}_INTERVAL", "30"))
+            devices.append(device)
+    return devices
+
+
 CONFIG = {
     "remote_api": os.getenv("REMOTE_API_URL", "https://your-site.vercel.app/api/ingest"),
     "api_key": os.getenv("API_KEY", ""),
     "mqtt_broker": os.getenv("MQTT_BROKER", "localhost"),
     "mqtt_port": int(os.getenv("MQTT_PORT", "1883")),
-    "sqm_host": os.getenv("SQM_HOST", ""),
-    "sqm_port": int(os.getenv("SQM_PORT", "10001")),
-    "weatherlink_host": os.getenv("WEATHERLINK_HOST", ""),
-    "weatherlink_interval": int(os.getenv("WEATHERLINK_INTERVAL", "30")),
-    "cloudwatcher_host": os.getenv("CLOUDWATCHER_HOST", ""),
-    "cloudwatcher_interval": int(os.getenv("CLOUDWATCHER_INTERVAL", "30")),
     "allsky_image_path": os.getenv("ALLSKY_IMAGE_PATH", "/home/pi/allsky/tmp/image.jpg"),
     "allsky_image_url": os.getenv("ALLSKY_IMAGE_URL", ""),  # Fallback URL if file not found
     "push_interval": int(os.getenv("PUSH_INTERVAL", "60")),
@@ -63,10 +78,11 @@ CONFIG = {
     "bom_satellite_interval": int(os.getenv("BOM_SATELLITE_INTERVAL", "600")),
     "bom_radar_station": os.getenv("BOM_RADAR_STATION", ""),  # e.g., "71" for Sydney
     "log_level": os.getenv("LOG_LEVEL", "INFO"),
-    # Multi-instrument codes
-    "instrument_code_sqm": os.getenv("INSTRUMENT_CODE_SQM", "sqm-primary"),
-    "instrument_code_weatherlink": os.getenv("INSTRUMENT_CODE_WEATHERLINK", "wx-weatherlink"),
-    "instrument_code_cloudwatcher": os.getenv("INSTRUMENT_CODE_CLOUDWATCHER", "cw-solo"),
+    # Multi-device configurations (up to 3 of each type)
+    "sqm_devices": get_device_configs("SQM"),
+    "davis_devices": get_device_configs("DAVIS"),
+    "cloudwatcher_devices": get_device_configs("CLOUDWATCHER"),
+    # Legacy single-device codes for MQTT sources
     "instrument_code_mqtt_weather": os.getenv("INSTRUMENT_CODE_MQTT_WEATHER", "wx-mqtt"),
     "instrument_code_allsky": os.getenv("INSTRUMENT_CODE_ALLSKY", "allsky-main"),
 }
@@ -326,19 +342,51 @@ def classify_day_condition(light_sensor: int) -> str:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# SQM READER
+# SQM READER (Multi-device support)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def read_sqm():
-    host = CONFIG["sqm_host"]
-    port = CONFIG["sqm_port"]
-    instrument_code = CONFIG["instrument_code_sqm"]
+def get_sqm_serial(sock) -> Optional[str]:
+    """
+    Query SQM unit information to get serial number.
+    Command 'ix' returns unit info including serial number.
+    Response format: i,00000002,00000003,00000001,00000413
+    The second field is the serial number.
+    """
+    try:
+        sock.sendall(b"ix")
+        time.sleep(0.5)
 
-    if not host:
-        logger.warning("SQM host not configured, skipping")
-        return
+        response = b""
+        while not response.endswith(b"\n"):
+            chunk = sock.recv(256)
+            if not chunk:
+                return None
+            response += chunk
 
-    logger.info(f"Starting SQM-LE reader [{instrument_code}] on {host}:{port}")
+        response_str = response.decode("ascii", errors="ignore").strip()
+
+        if response_str.startswith("i,"):
+            parts = response_str.split(",")
+            if len(parts) >= 2:
+                serial = parts[1].strip().lstrip("0") or "0"
+                return serial
+    except Exception as e:
+        logger.warning(f"Failed to get SQM serial: {e}")
+
+    return None
+
+
+def read_sqm_device(device_config: dict):
+    """Read from a single SQM-LE device."""
+    host = device_config["host"]
+    port = device_config["port"]
+    slot = device_config["slot"]
+
+    # Initial instrument code based on IP (will be updated with serial if available)
+    instrument_code = f"sqm-{host.replace('.', '-')}"
+    serial_obtained = False
+
+    logger.info(f"Starting SQM-LE reader slot {slot} on {host}:{port}")
 
     while True:
         try:
@@ -346,6 +394,16 @@ def read_sqm():
                 sock.settimeout(10)
                 sock.connect((host, port))
                 logger.info(f"Connected to SQM-LE at {host}:{port}")
+
+                # Try to get serial number on first successful connection
+                if not serial_obtained:
+                    serial = get_sqm_serial(sock)
+                    if serial:
+                        instrument_code = f"sqm-{serial}"
+                        serial_obtained = True
+                        logger.info(f"SQM at {host} identified as serial {serial}, code: {instrument_code}")
+                    else:
+                        logger.info(f"SQM at {host} using IP-based code: {instrument_code}")
 
                 while True:
                     sock.sendall(b"rx")
@@ -382,15 +440,15 @@ def read_sqm():
                     time.sleep(60)
 
         except (socket.error, ConnectionError) as e:
-            logger.error(f"SQM connection error: {e}")
+            logger.error(f"SQM {host} connection error: {e}")
             time.sleep(60)
         except Exception as e:
-            logger.error(f"SQM error: {e}")
+            logger.error(f"SQM {host} error: {e}")
             time.sleep(60)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# WEATHERLINK LIVE READER
+# WEATHERLINK LIVE READER (Multi-device support)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def fahrenheit_to_celsius(f: float) -> float:
@@ -403,18 +461,42 @@ def inches_to_hpa(inches: float) -> float:
     return inches * 33.8639
 
 
-def read_weatherlink():
-    """Read weather data from WeatherLink Live local API."""
-    host = CONFIG["weatherlink_host"]
-    interval = CONFIG["weatherlink_interval"]
-    instrument_code = CONFIG["instrument_code_weatherlink"]
+def get_weatherlink_lsid(host: str) -> Optional[str]:
+    """
+    Query WeatherLink Live to get Logical Sensor ID (lsid).
+    The lsid uniquely identifies each sensor suite.
+    """
+    try:
+        url = f"http://{host}/v1/current_conditions"
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        data = response.json()
 
-    if not host:
-        logger.warning("WeatherLink host not configured, skipping")
-        return
+        conditions = data.get("data", {}).get("conditions", [])
+        for condition in conditions:
+            # Type 1 = ISS (the main outdoor sensor)
+            if condition.get("data_structure_type") == 1:
+                lsid = condition.get("lsid")
+                if lsid:
+                    return str(lsid)
+        return None
+    except Exception as e:
+        logger.warning(f"Failed to get WeatherLink lsid from {host}: {e}")
+        return None
+
+
+def read_weatherlink_device(device_config: dict):
+    """Read weather data from a single WeatherLink Live device."""
+    host = device_config["host"]
+    interval = device_config["interval"]
+    slot = device_config["slot"]
+
+    # Initial instrument code based on IP (will be updated with lsid if available)
+    instrument_code = f"davis-{host.replace('.', '-')}"
+    lsid_obtained = False
 
     url = f"http://{host}/v1/current_conditions"
-    logger.info(f"Starting WeatherLink Live reader [{instrument_code}] at {url}")
+    logger.info(f"Starting WeatherLink Live reader slot {slot} at {url}")
 
     while True:
         try:
@@ -428,6 +510,20 @@ def read_weatherlink():
                 continue
 
             conditions = data.get("data", {}).get("conditions", [])
+
+            # Try to get lsid on first successful response
+            if not lsid_obtained:
+                for condition in conditions:
+                    if condition.get("data_structure_type") == 1:
+                        lsid = condition.get("lsid")
+                        if lsid:
+                            instrument_code = f"davis-{lsid}"
+                            lsid_obtained = True
+                            logger.info(f"WeatherLink at {host} identified as lsid {lsid}, code: {instrument_code}")
+                            break
+                if not lsid_obtained:
+                    logger.info(f"WeatherLink at {host} using IP-based code: {instrument_code}")
+                    lsid_obtained = True  # Don't keep trying
 
             updates = {}
 
@@ -463,32 +559,67 @@ def read_weatherlink():
                 data_store.update(instrument_code, **updates)
 
         except requests.RequestException as e:
-            logger.error(f"WeatherLink request error: {e}")
+            logger.error(f"WeatherLink {host} request error: {e}")
         except Exception as e:
-            logger.error(f"WeatherLink error: {e}")
+            logger.error(f"WeatherLink {host} error: {e}")
 
         time.sleep(interval)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# CLOUDWATCHER CGI READER
+# CLOUDWATCHER CGI READER (Multi-device support)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def read_cloudwatcher_cgi():
-    """Read weather data from AAG Cloudwatcher CGI interface."""
-    host = CONFIG["cloudwatcher_host"]
-    interval = CONFIG["cloudwatcher_interval"]
-    instrument_code = CONFIG["instrument_code_cloudwatcher"]
+def get_cloudwatcher_serial(host: str) -> Optional[str]:
+    """
+    Query Cloudwatcher debug endpoint to get serial number.
+    The /cgi-bin/cgiDebugData endpoint returns device info including serial.
+    """
+    try:
+        url = f"http://{host}/cgi-bin/cgiDebugData"
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
 
-    if not host:
-        logger.warning("Cloudwatcher CGI host not configured, skipping")
-        return
+        # Parse key=value format
+        for line in response.text.strip().split("\n"):
+            if "=" in line:
+                key, value = line.split("=", 1)
+                key = key.strip().lower()
+                value = value.strip()
+                # Look for "serial num" or similar keys
+                if "serial" in key:
+                    return value
+        return None
+    except Exception as e:
+        logger.warning(f"Failed to get Cloudwatcher serial from {host}: {e}")
+        return None
+
+
+def read_cloudwatcher_device(device_config: dict):
+    """Read weather data from a single AAG Cloudwatcher CGI interface."""
+    host = device_config["host"]
+    interval = device_config["interval"]
+    slot = device_config["slot"]
+
+    # Initial instrument code based on IP (will be updated with serial if available)
+    instrument_code = f"cw-{host.replace('.', '-')}"
+    serial_obtained = False
 
     url = f"http://{host}/cgi-bin/cgiLastData"
-    logger.info(f"Starting Cloudwatcher CGI reader [{instrument_code}] at {url}")
+    logger.info(f"Starting Cloudwatcher CGI reader slot {slot} at {url}")
 
     while True:
         try:
+            # Try to get serial number on first run
+            if not serial_obtained:
+                serial = get_cloudwatcher_serial(host)
+                if serial:
+                    instrument_code = f"cw-{serial}"
+                    logger.info(f"Cloudwatcher at {host} identified as serial {serial}, code: {instrument_code}")
+                else:
+                    logger.info(f"Cloudwatcher at {host} using IP-based code: {instrument_code}")
+                serial_obtained = True
+
             response = requests.get(url, timeout=10)
             response.raise_for_status()
 
@@ -544,9 +675,9 @@ def read_cloudwatcher_cgi():
                 data_store.update(instrument_code, **updates)
 
         except requests.RequestException as e:
-            logger.error(f"Cloudwatcher CGI request error: {e}")
+            logger.error(f"Cloudwatcher {host} CGI request error: {e}")
         except Exception as e:
-            logger.error(f"Cloudwatcher CGI error: {e}")
+            logger.error(f"Cloudwatcher {host} CGI error: {e}")
 
         time.sleep(interval)
 
@@ -838,21 +969,62 @@ def main():
     logger.info(f"Remote API: {CONFIG['remote_api']}")
     logger.info(f"MQTT Broker: {CONFIG['mqtt_broker']}:{CONFIG['mqtt_port']}")
     logger.info(f"Push Interval: {CONFIG['push_interval']}s")
-    logger.info(f"Instrument Codes:")
-    logger.info(f"  SQM: {CONFIG['instrument_code_sqm']}")
-    logger.info(f"  WeatherLink: {CONFIG['instrument_code_weatherlink']}")
-    logger.info(f"  Cloudwatcher: {CONFIG['instrument_code_cloudwatcher']}")
-    logger.info(f"  MQTT Weather: {CONFIG['instrument_code_mqtt_weather']}")
+
+    # Log configured devices
+    logger.info("Configured Devices:")
+    sqm_devices = CONFIG["sqm_devices"]
+    davis_devices = CONFIG["davis_devices"]
+    cloudwatcher_devices = CONFIG["cloudwatcher_devices"]
+
+    logger.info(f"  SQM devices: {len(sqm_devices)}")
+    for d in sqm_devices:
+        logger.info(f"    Slot {d['slot']}: {d['host']}:{d['port']}")
+
+    logger.info(f"  Davis devices: {len(davis_devices)}")
+    for d in davis_devices:
+        logger.info(f"    Slot {d['slot']}: {d['host']} (interval: {d['interval']}s)")
+
+    logger.info(f"  Cloudwatcher devices: {len(cloudwatcher_devices)}")
+    for d in cloudwatcher_devices:
+        logger.info(f"    Slot {d['slot']}: {d['host']} (interval: {d['interval']}s)")
 
     mqtt_client = start_mqtt()
 
-    threads = [
-        threading.Thread(target=read_sqm, daemon=True, name="sqm"),
-        threading.Thread(target=read_weatherlink, daemon=True, name="weatherlink"),
-        threading.Thread(target=read_cloudwatcher_cgi, daemon=True, name="cloudwatcher-cgi"),
-        threading.Thread(target=push_data, daemon=True, name="pusher"),
-        threading.Thread(target=push_bom_imagery, daemon=True, name="bom-imagery"),
-    ]
+    threads = []
+
+    # Create threads for each configured SQM device
+    for device in sqm_devices:
+        t = threading.Thread(
+            target=read_sqm_device,
+            args=(device,),
+            daemon=True,
+            name=f"sqm-{device['slot']}"
+        )
+        threads.append(t)
+
+    # Create threads for each configured Davis device
+    for device in davis_devices:
+        t = threading.Thread(
+            target=read_weatherlink_device,
+            args=(device,),
+            daemon=True,
+            name=f"davis-{device['slot']}"
+        )
+        threads.append(t)
+
+    # Create threads for each configured Cloudwatcher device
+    for device in cloudwatcher_devices:
+        t = threading.Thread(
+            target=read_cloudwatcher_device,
+            args=(device,),
+            daemon=True,
+            name=f"cloudwatcher-{device['slot']}"
+        )
+        threads.append(t)
+
+    # Add data pusher and BOM imagery threads
+    threads.append(threading.Thread(target=push_data, daemon=True, name="pusher"))
+    threads.append(threading.Thread(target=push_bom_imagery, daemon=True, name="bom-imagery"))
 
     for t in threads:
         logger.info(f"Starting thread: {t.name}")
