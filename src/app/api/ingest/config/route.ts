@@ -109,6 +109,7 @@ export async function POST(request: NextRequest) {
       success: true,
       timestamp,
       instruments_registered: expectedCodes.length,
+      api_version: "2026-01-14-v2",  // Deployment verification
     });
   } catch (error) {
     console.error("Config ingest error:", error);
