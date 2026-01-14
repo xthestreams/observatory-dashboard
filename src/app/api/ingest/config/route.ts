@@ -68,17 +68,39 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Mark instruments NOT in this config (but from this collector) as not expected
-    // This handles cases where a device was removed from the Pi config
-    if (payload.collector_id && expectedCodes.length > 0) {
-      const { error: updateError } = await supabase
+    // Mark instruments NOT in this config as not expected
+    // This handles cases where:
+    // 1. A device was removed from the Pi config (same collector_id)
+    // 2. Old ghost entries from other collector_ids need cleanup
+    // 3. Test instruments that should be cleaned up
+    if (expectedCodes.length > 0) {
+      // First, clear expected flag for instruments from THIS collector that aren't in the list
+      if (payload.collector_id) {
+        const { error: updateError1 } = await supabase
+          .from("instruments")
+          .update({ expected: false, updated_at: timestamp })
+          .eq("collector_id", payload.collector_id)
+          .filter("code", "not.in", `(${expectedCodes.join(",")})`);
+
+        if (updateError1) {
+          console.error("Error marking removed instruments (same collector):", updateError1);
+        }
+      }
+
+      // Also mark as not expected any instruments that:
+      // 1. Have expected=true
+      // 2. Have never received data (last_reading_at is null)
+      // 3. Are NOT in the current config list
+      // This cleans up ghost entries from test pushes
+      const { error: updateError2 } = await supabase
         .from("instruments")
         .update({ expected: false, updated_at: timestamp })
-        .eq("collector_id", payload.collector_id)
+        .eq("expected", true)
+        .is("last_reading_at", null)
         .filter("code", "not.in", `(${expectedCodes.join(",")})`);
 
-      if (updateError) {
-        console.error("Error marking removed instruments:", updateError);
+      if (updateError2) {
+        console.error("Error cleaning up ghost instruments:", updateError2);
       }
     }
 
