@@ -86,128 +86,152 @@
         </div>
     </div>
 
-    <!-- Step 2: Weather Station -->
+    <!-- Step 2: Weather Stations (Davis) - Up to 3 -->
     <div class="wizard-step" data-step="2">
         <div class="card">
             <div class="card-header">
-                <h2>Weather Station</h2>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="weatherlink_enabled"
-                           {% if config.WEATHERLINK_HOST %}checked{% endif %}>
-                    <span class="toggle-slider"></span>
-                </label>
+                <h2>Davis WeatherLink Live</h2>
+                <span class="badge">Up to 3 devices</span>
             </div>
             <div class="card-body">
                 <p class="step-description">
-                    Configure your Davis WeatherLink Live device for temperature, humidity, wind, and pressure data.
+                    Configure your Davis WeatherLink Live device(s) for temperature, humidity, wind, and pressure data.
+                    Serial numbers (lsid) are automatically detected.
                 </p>
 
-                <div class="conditional-fields" id="weatherlink-fields">
-                    <div class="form-group">
-                        <label for="weatherlink_host">WeatherLink IP Address</label>
-                        <input type="text" id="weatherlink_host" name="WEATHERLINK_HOST"
-                               value="{{ config.WEATHERLINK_HOST }}"
-                               placeholder="192.168.1.100">
-                        <span class="help-text">Local IP address of your WeatherLink Live device</span>
+                {% for i in range(1, 4) %}
+                <div class="device-slot">
+                    <div class="device-slot-header">
+                        <h4>Weather Station {{ i }}</h4>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="davis_{{ i }}_enabled"
+                                   {% if config['DAVIS_' ~ i ~ '_HOST'] %}checked{% endif %}
+                                   onchange="toggleDeviceSlot('davis', {{ i }})">
+                            <span class="toggle-slider"></span>
+                        </label>
                     </div>
-
-                    <div class="form-group">
-                        <label for="weatherlink_interval">Polling Interval (seconds)</label>
-                        <input type="range" id="weatherlink_interval" name="WEATHERLINK_INTERVAL"
-                               min="10" max="120" step="5"
-                               value="{{ config.WEATHERLINK_INTERVAL }}"
-                               oninput="document.getElementById('weatherlink_interval_val').textContent = this.value">
-                        <span class="range-value" id="weatherlink_interval_val">{{ config.WEATHERLINK_INTERVAL }}</span>
+                    <div class="device-slot-fields" id="davis-{{ i }}-fields" style="display: {% if config['DAVIS_' ~ i ~ '_HOST'] %}block{% else %}none{% endif %}">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>IP Address</label>
+                                <input type="text" id="davis_{{ i }}_host" name="DAVIS_{{ i }}_HOST"
+                                       value="{{ config['DAVIS_' ~ i ~ '_HOST'] }}"
+                                       placeholder="192.168.1.x">
+                            </div>
+                            <div class="form-group">
+                                <label>Interval (s)</label>
+                                <input type="number" id="davis_{{ i }}_interval" name="DAVIS_{{ i }}_INTERVAL"
+                                       value="{{ config['DAVIS_' ~ i ~ '_INTERVAL'] or '30' }}"
+                                       min="10" max="120">
+                            </div>
+                            <div class="form-group form-group-btn">
+                                <button type="button" class="btn btn-sm" onclick="testDavis({{ i }})">Test</button>
+                            </div>
+                        </div>
+                        <div id="davis-{{ i }}-result" class="test-result"></div>
                     </div>
-
-                    <button type="button" class="btn btn-primary" onclick="testStep2()">
-                        Test Connection
-                    </button>
-                    <div id="step2-result" class="test-result"></div>
                 </div>
+                {% endfor %}
             </div>
         </div>
     </div>
 
-    <!-- Step 3: SQM -->
+    <!-- Step 3: SQM Devices - Up to 3 -->
     <div class="wizard-step" data-step="3">
         <div class="card">
             <div class="card-header">
-                <h2>Sky Quality Meter</h2>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="sqm_enabled"
-                           {% if config.SQM_HOST %}checked{% endif %}>
-                    <span class="toggle-slider"></span>
-                </label>
+                <h2>Sky Quality Meters (SQM-LE)</h2>
+                <span class="badge">Up to 3 devices</span>
             </div>
             <div class="card-body">
                 <p class="step-description">
-                    Configure your Unihedron SQM-LE sky quality meter for darkness measurements.
+                    Configure your Unihedron SQM-LE sky quality meter(s) for darkness measurements.
+                    Serial numbers are automatically detected from each device.
                 </p>
 
-                <div class="conditional-fields" id="sqm-fields">
-                    <div class="form-group">
-                        <label for="sqm_host">SQM IP Address</label>
-                        <input type="text" id="sqm_host" name="SQM_HOST"
-                               value="{{ config.SQM_HOST }}"
-                               placeholder="192.168.1.101">
+                {% for i in range(1, 4) %}
+                <div class="device-slot">
+                    <div class="device-slot-header">
+                        <h4>SQM {{ i }}</h4>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="sqm_{{ i }}_enabled"
+                                   {% if config['SQM_' ~ i ~ '_HOST'] %}checked{% endif %}
+                                   onchange="toggleDeviceSlot('sqm', {{ i }})">
+                            <span class="toggle-slider"></span>
+                        </label>
                     </div>
-
-                    <div class="form-group">
-                        <label for="sqm_port">SQM Port</label>
-                        <input type="number" id="sqm_port" name="SQM_PORT"
-                               value="{{ config.SQM_PORT }}"
-                               placeholder="10001">
-                        <span class="help-text">Default is 10001</span>
+                    <div class="device-slot-fields" id="sqm-{{ i }}-fields" style="display: {% if config['SQM_' ~ i ~ '_HOST'] %}block{% else %}none{% endif %}">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>IP Address</label>
+                                <input type="text" id="sqm_{{ i }}_host" name="SQM_{{ i }}_HOST"
+                                       value="{{ config['SQM_' ~ i ~ '_HOST'] }}"
+                                       placeholder="192.168.1.x">
+                            </div>
+                            <div class="form-group">
+                                <label>Port</label>
+                                <input type="number" id="sqm_{{ i }}_port" name="SQM_{{ i }}_PORT"
+                                       value="{{ config['SQM_' ~ i ~ '_PORT'] or '10001' }}"
+                                       placeholder="10001">
+                            </div>
+                            <div class="form-group form-group-btn">
+                                <button type="button" class="btn btn-sm" onclick="testSqm({{ i }})">Test</button>
+                            </div>
+                        </div>
+                        <div id="sqm-{{ i }}-result" class="test-result"></div>
                     </div>
-
-                    <button type="button" class="btn btn-primary" onclick="testStep3()">
-                        Test Connection
-                    </button>
-                    <div id="step3-result" class="test-result"></div>
                 </div>
+                {% endfor %}
             </div>
         </div>
     </div>
 
-    <!-- Step 4: Cloudwatcher -->
+    <!-- Step 4: Cloudwatcher Devices - Up to 3 -->
     <div class="wizard-step" data-step="4">
         <div class="card">
             <div class="card-header">
-                <h2>Cloud Sensor</h2>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="cloudwatcher_enabled"
-                           {% if config.CLOUDWATCHER_HOST %}checked{% endif %}>
-                    <span class="toggle-slider"></span>
-                </label>
+                <h2>AAG Cloudwatcher</h2>
+                <span class="badge">Up to 3 devices</span>
             </div>
             <div class="card-body">
                 <p class="step-description">
-                    Configure your AAG Cloudwatcher for cloud, rain, and sky condition monitoring.
+                    Configure your AAG Cloudwatcher device(s) for cloud, rain, and sky condition monitoring.
+                    Serial numbers are automatically detected from each device.
                 </p>
 
-                <div class="conditional-fields" id="cloudwatcher-fields">
-                    <div class="form-group">
-                        <label for="cloudwatcher_host">Cloudwatcher IP Address</label>
-                        <input type="text" id="cloudwatcher_host" name="CLOUDWATCHER_HOST"
-                               value="{{ config.CLOUDWATCHER_HOST }}"
-                               placeholder="192.168.1.102">
+                {% for i in range(1, 4) %}
+                <div class="device-slot">
+                    <div class="device-slot-header">
+                        <h4>Cloudwatcher {{ i }}</h4>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="cloudwatcher_{{ i }}_enabled"
+                                   {% if config['CLOUDWATCHER_' ~ i ~ '_HOST'] %}checked{% endif %}
+                                   onchange="toggleDeviceSlot('cloudwatcher', {{ i }})">
+                            <span class="toggle-slider"></span>
+                        </label>
                     </div>
-
-                    <div class="form-group">
-                        <label for="cloudwatcher_interval">Polling Interval (seconds)</label>
-                        <input type="range" id="cloudwatcher_interval" name="CLOUDWATCHER_INTERVAL"
-                               min="10" max="120" step="5"
-                               value="{{ config.CLOUDWATCHER_INTERVAL }}"
-                               oninput="document.getElementById('cloudwatcher_interval_val').textContent = this.value">
-                        <span class="range-value" id="cloudwatcher_interval_val">{{ config.CLOUDWATCHER_INTERVAL }}</span>
+                    <div class="device-slot-fields" id="cloudwatcher-{{ i }}-fields" style="display: {% if config['CLOUDWATCHER_' ~ i ~ '_HOST'] %}block{% else %}none{% endif %}">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>IP Address</label>
+                                <input type="text" id="cloudwatcher_{{ i }}_host" name="CLOUDWATCHER_{{ i }}_HOST"
+                                       value="{{ config['CLOUDWATCHER_' ~ i ~ '_HOST'] }}"
+                                       placeholder="192.168.1.x">
+                            </div>
+                            <div class="form-group">
+                                <label>Interval (s)</label>
+                                <input type="number" id="cloudwatcher_{{ i }}_interval" name="CLOUDWATCHER_{{ i }}_INTERVAL"
+                                       value="{{ config['CLOUDWATCHER_' ~ i ~ '_INTERVAL'] or '30' }}"
+                                       min="10" max="120">
+                            </div>
+                            <div class="form-group form-group-btn">
+                                <button type="button" class="btn btn-sm" onclick="testCloudwatcher({{ i }})">Test</button>
+                            </div>
+                        </div>
+                        <div id="cloudwatcher-{{ i }}-result" class="test-result"></div>
                     </div>
-
-                    <button type="button" class="btn btn-primary" onclick="testStep4()">
-                        Test Connection
-                    </button>
-                    <div id="step4-result" class="test-result"></div>
                 </div>
+                {% endfor %}
             </div>
         </div>
     </div>
@@ -411,10 +435,19 @@ function goToStep(step) {
     updateProgress();
 }
 
-function updateReviewSummary() {
-    const summary = document.getElementById('review-summary');
-    const form = document.getElementById('wizard-form');
+function toggleDeviceSlot(type, slot) {
+    const checkbox = document.getElementById(`${type}_${slot}_enabled`);
+    const fields = document.getElementById(`${type}-${slot}-fields`);
+    fields.style.display = checkbox.checked ? 'block' : 'none';
+    if (!checkbox.checked) {
+        // Clear host when disabled
+        const hostInput = document.getElementById(`${type}_${slot}_host`);
+        if (hostInput) hostInput.value = '';
+    }
+}
 
+function updateReviewSummary() {
+    const form = document.getElementById('wizard-form');
     let html = '<table class="review-table">';
 
     // API
@@ -422,24 +455,34 @@ function updateReviewSummary() {
     html += `<tr><td>URL</td><td>${form.REMOTE_API_URL.value}</td></tr>`;
     html += `<tr><td>API Key</td><td>****${form.API_KEY.value.slice(-4)}</td></tr>`;
 
-    // Weather
-    if (document.getElementById('weatherlink_enabled').checked) {
-        html += `<tr><th colspan="2">Weather Station</th></tr>`;
-        html += `<tr><td>Host</td><td>${form.WEATHERLINK_HOST.value}</td></tr>`;
-        html += `<tr><td>Interval</td><td>${form.WEATHERLINK_INTERVAL.value}s</td></tr>`;
+    // Davis devices
+    let davisCount = 0;
+    for (let i = 1; i <= 3; i++) {
+        if (document.getElementById(`davis_${i}_enabled`).checked && form[`DAVIS_${i}_HOST`].value) {
+            if (davisCount === 0) html += `<tr><th colspan="2">Weather Stations</th></tr>`;
+            davisCount++;
+            html += `<tr><td>Davis ${i}</td><td>${form[`DAVIS_${i}_HOST`].value} (${form[`DAVIS_${i}_INTERVAL`].value}s)</td></tr>`;
+        }
     }
 
-    // SQM
-    if (document.getElementById('sqm_enabled').checked) {
-        html += `<tr><th colspan="2">Sky Quality Meter</th></tr>`;
-        html += `<tr><td>Host</td><td>${form.SQM_HOST.value}:${form.SQM_PORT.value}</td></tr>`;
+    // SQM devices
+    let sqmCount = 0;
+    for (let i = 1; i <= 3; i++) {
+        if (document.getElementById(`sqm_${i}_enabled`).checked && form[`SQM_${i}_HOST`].value) {
+            if (sqmCount === 0) html += `<tr><th colspan="2">Sky Quality Meters</th></tr>`;
+            sqmCount++;
+            html += `<tr><td>SQM ${i}</td><td>${form[`SQM_${i}_HOST`].value}:${form[`SQM_${i}_PORT`].value}</td></tr>`;
+        }
     }
 
-    // Cloudwatcher
-    if (document.getElementById('cloudwatcher_enabled').checked) {
-        html += `<tr><th colspan="2">Cloud Sensor</th></tr>`;
-        html += `<tr><td>Host</td><td>${form.CLOUDWATCHER_HOST.value}</td></tr>`;
-        html += `<tr><td>Interval</td><td>${form.CLOUDWATCHER_INTERVAL.value}s</td></tr>`;
+    // Cloudwatcher devices
+    let cwCount = 0;
+    for (let i = 1; i <= 3; i++) {
+        if (document.getElementById(`cloudwatcher_${i}_enabled`).checked && form[`CLOUDWATCHER_${i}_HOST`].value) {
+            if (cwCount === 0) html += `<tr><th colspan="2">Cloud Sensors</th></tr>`;
+            cwCount++;
+            html += `<tr><td>Cloudwatcher ${i}</td><td>${form[`CLOUDWATCHER_${i}_HOST`].value} (${form[`CLOUDWATCHER_${i}_INTERVAL`].value}s)</td></tr>`;
+        }
     }
 
     // AllSky
@@ -460,30 +503,27 @@ function updateReviewSummary() {
         html += `<tr><td>Interval</td><td>${form.BOM_SATELLITE_INTERVAL.value}s</td></tr>`;
     }
 
+    // Summary counts
+    html += `<tr><th colspan="2">Summary</th></tr>`;
+    html += `<tr><td>Total Instruments</td><td>${davisCount + sqmCount + cwCount} devices configured</td></tr>`;
+
     html += '</table>';
-    summary.innerHTML = html;
+    document.getElementById('review-summary').innerHTML = html;
 }
 
 // Toggle conditional fields based on checkbox state
 function setupToggles() {
     const toggles = [
-        ['weatherlink_enabled', 'weatherlink-fields', 'WEATHERLINK_HOST'],
-        ['sqm_enabled', 'sqm-fields', 'SQM_HOST'],
-        ['cloudwatcher_enabled', 'cloudwatcher-fields', 'CLOUDWATCHER_HOST'],
-        ['allsky_enabled', 'allsky-fields', 'ALLSKY_IMAGE_PATH'],
-        ['bom_enabled', 'bom-fields', null]
+        ['allsky_enabled', 'allsky-fields'],
+        ['bom_enabled', 'bom-fields']
     ];
 
-    toggles.forEach(([checkboxId, fieldsId, clearField]) => {
+    toggles.forEach(([checkboxId, fieldsId]) => {
         const checkbox = document.getElementById(checkboxId);
         const fields = document.getElementById(fieldsId);
 
         function updateVisibility() {
             fields.style.display = checkbox.checked ? 'block' : 'none';
-            if (!checkbox.checked && clearField) {
-                const input = document.querySelector(`[name="${clearField}"]`);
-                if (input) input.value = '';
-            }
         }
 
         checkbox.addEventListener('change', updateVisibility);
@@ -491,7 +531,7 @@ function setupToggles() {
     });
 }
 
-// Test functions for each step
+// Test functions
 function testStep1() {
     const resultDiv = document.getElementById('step1-result');
     resultDiv.innerHTML = '<span class="loading">Testing connection...</span>';
@@ -517,15 +557,15 @@ function testStep1() {
     });
 }
 
-function testStep2() {
-    const resultDiv = document.getElementById('step2-result');
+function testDavis(slot) {
+    const resultDiv = document.getElementById(`davis-${slot}-result`);
     resultDiv.innerHTML = '<span class="loading">Testing connection...</span>';
 
     fetch('/api/test/weatherlink', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
-            host: document.getElementById('weatherlink_host').value
+            host: document.getElementById(`davis_${slot}_host`).value
         })
     })
     .then(r => r.json())
@@ -536,7 +576,7 @@ function testStep2() {
                 html += '<div class="reading-preview">';
                 if (data.data.temperature_c !== undefined) html += `<span>Temp: ${data.data.temperature_c}°C</span>`;
                 if (data.data.humidity !== undefined) html += `<span>Humidity: ${data.data.humidity}%</span>`;
-                if (data.data.pressure_hpa !== undefined) html += `<span>Pressure: ${data.data.pressure_hpa} hPa</span>`;
+                if (data.data.lsid !== undefined) html += `<span>LSID: ${data.data.lsid}</span>`;
                 html += '</div>';
             }
             resultDiv.innerHTML = html;
@@ -549,16 +589,16 @@ function testStep2() {
     });
 }
 
-function testStep3() {
-    const resultDiv = document.getElementById('step3-result');
+function testSqm(slot) {
+    const resultDiv = document.getElementById(`sqm-${slot}-result`);
     resultDiv.innerHTML = '<span class="loading">Testing connection...</span>';
 
     fetch('/api/test/sqm', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
-            host: document.getElementById('sqm_host').value,
-            port: parseInt(document.getElementById('sqm_port').value)
+            host: document.getElementById(`sqm_${slot}_host`).value,
+            port: parseInt(document.getElementById(`sqm_${slot}_port`).value)
         })
     })
     .then(r => r.json())
@@ -567,8 +607,9 @@ function testStep3() {
             let html = '<span class="success">Connected!</span>';
             if (data.data) {
                 html += '<div class="reading-preview">';
-                if (data.data.sky_quality !== undefined) html += `<span>Sky Quality: ${data.data.sky_quality} mag/arcsec²</span>`;
+                if (data.data.sky_quality !== undefined) html += `<span>SQM: ${data.data.sky_quality} mag/arcsec²</span>`;
                 if (data.data.temperature !== undefined) html += `<span>Temp: ${data.data.temperature}°C</span>`;
+                if (data.data.serial !== undefined) html += `<span>Serial: ${data.data.serial}</span>`;
                 html += '</div>';
             }
             resultDiv.innerHTML = html;
@@ -581,15 +622,15 @@ function testStep3() {
     });
 }
 
-function testStep4() {
-    const resultDiv = document.getElementById('step4-result');
+function testCloudwatcher(slot) {
+    const resultDiv = document.getElementById(`cloudwatcher-${slot}-result`);
     resultDiv.innerHTML = '<span class="loading">Testing connection...</span>';
 
     fetch('/api/test/cloudwatcher', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
-            host: document.getElementById('cloudwatcher_host').value
+            host: document.getElementById(`cloudwatcher_${slot}_host`).value
         })
     })
     .then(r => r.json())
@@ -600,7 +641,7 @@ function testStep4() {
                 html += '<div class="reading-preview">';
                 html += `<span>Cloud: ${data.data.cloud_safe ? 'Clear' : 'Cloudy'}</span>`;
                 html += `<span>Rain: ${data.data.rain_safe ? 'Dry' : 'Wet'}</span>`;
-                html += `<span>Wind: ${data.data.wind_safe ? 'Calm' : 'Windy'}</span>`;
+                if (data.data.serial !== undefined) html += `<span>Serial: ${data.data.serial}</span>`;
                 html += '</div>';
             }
             resultDiv.innerHTML = html;
@@ -646,28 +687,37 @@ function saveConfig() {
     config.REMOTE_API_URL = form.REMOTE_API_URL.value;
     config.API_KEY = form.API_KEY.value;
 
-    // WeatherLink
-    if (document.getElementById('weatherlink_enabled').checked) {
-        config.WEATHERLINK_HOST = form.WEATHERLINK_HOST.value;
-        config.WEATHERLINK_INTERVAL = form.WEATHERLINK_INTERVAL.value;
-    } else {
-        config.WEATHERLINK_HOST = '';
+    // Davis devices
+    for (let i = 1; i <= 3; i++) {
+        if (document.getElementById(`davis_${i}_enabled`).checked) {
+            config[`DAVIS_${i}_HOST`] = form[`DAVIS_${i}_HOST`].value;
+            config[`DAVIS_${i}_INTERVAL`] = form[`DAVIS_${i}_INTERVAL`].value;
+        } else {
+            config[`DAVIS_${i}_HOST`] = '';
+            config[`DAVIS_${i}_INTERVAL`] = '30';
+        }
     }
 
-    // SQM
-    if (document.getElementById('sqm_enabled').checked) {
-        config.SQM_HOST = form.SQM_HOST.value;
-        config.SQM_PORT = form.SQM_PORT.value;
-    } else {
-        config.SQM_HOST = '';
+    // SQM devices
+    for (let i = 1; i <= 3; i++) {
+        if (document.getElementById(`sqm_${i}_enabled`).checked) {
+            config[`SQM_${i}_HOST`] = form[`SQM_${i}_HOST`].value;
+            config[`SQM_${i}_PORT`] = form[`SQM_${i}_PORT`].value;
+        } else {
+            config[`SQM_${i}_HOST`] = '';
+            config[`SQM_${i}_PORT`] = '10001';
+        }
     }
 
-    // Cloudwatcher
-    if (document.getElementById('cloudwatcher_enabled').checked) {
-        config.CLOUDWATCHER_HOST = form.CLOUDWATCHER_HOST.value;
-        config.CLOUDWATCHER_INTERVAL = form.CLOUDWATCHER_INTERVAL.value;
-    } else {
-        config.CLOUDWATCHER_HOST = '';
+    // Cloudwatcher devices
+    for (let i = 1; i <= 3; i++) {
+        if (document.getElementById(`cloudwatcher_${i}_enabled`).checked) {
+            config[`CLOUDWATCHER_${i}_HOST`] = form[`CLOUDWATCHER_${i}_HOST`].value;
+            config[`CLOUDWATCHER_${i}_INTERVAL`] = form[`CLOUDWATCHER_${i}_INTERVAL`].value;
+        } else {
+            config[`CLOUDWATCHER_${i}_HOST`] = '';
+            config[`CLOUDWATCHER_${i}_INTERVAL`] = '30';
+        }
     }
 
     // AllSky

@@ -55,93 +55,113 @@
         </div>
     </div>
 
-    <!-- SQM Section -->
+    <!-- SQM Section - Multi-device -->
     <div class="card">
         <div class="card-header">
-            <h2>Sky Quality Meter (SQM-LE)</h2>
+            <h2>Sky Quality Meters (SQM-LE)</h2>
+            <span class="badge">Up to 3 devices</span>
         </div>
         <div class="card-body">
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="SQM_HOST">Host</label>
-                    <input type="text" id="SQM_HOST" name="SQM_HOST"
-                           value="{{ config.SQM_HOST }}"
-                           placeholder="192.168.1.x (leave empty to disable)">
+            <p class="help-text">Configure up to 3 SQM-LE devices. Leave Host empty to disable a slot.</p>
+
+            {% for i in range(1, 4) %}
+            <div class="device-slot">
+                <div class="device-slot-header">
+                    <h4>SQM {{ i }}</h4>
+                    <span class="slot-status {% if config['SQM_' ~ i ~ '_HOST'] %}enabled{% else %}disabled{% endif %}">
+                        {% if config['SQM_' ~ i ~ '_HOST'] %}Configured{% else %}Empty{% endif %}
+                    </span>
                 </div>
-                <div class="form-group">
-                    <label for="SQM_PORT">Port</label>
-                    <input type="number" id="SQM_PORT" name="SQM_PORT"
-                           value="{{ config.SQM_PORT }}"
-                           placeholder="{{ defaults.SQM_PORT }}">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="SQM_{{ i }}_HOST">Host</label>
+                        <input type="text" id="SQM_{{ i }}_HOST" name="SQM_{{ i }}_HOST"
+                               value="{{ config['SQM_' ~ i ~ '_HOST'] }}"
+                               placeholder="192.168.1.x (leave empty to disable)">
+                    </div>
+                    <div class="form-group">
+                        <label for="SQM_{{ i }}_PORT">Port</label>
+                        <input type="number" id="SQM_{{ i }}_PORT" name="SQM_{{ i }}_PORT"
+                               value="{{ config['SQM_' ~ i ~ '_PORT'] }}"
+                               placeholder="{{ defaults['SQM_' ~ i ~ '_PORT'] }}">
+                    </div>
                 </div>
             </div>
-            <div class="form-group">
-                <label for="INSTRUMENT_CODE_SQM">Instrument Code</label>
-                <input type="text" id="INSTRUMENT_CODE_SQM" name="INSTRUMENT_CODE_SQM"
-                       value="{{ config.INSTRUMENT_CODE_SQM }}"
-                       placeholder="{{ defaults.INSTRUMENT_CODE_SQM }}">
-                <span class="help-text">Unique identifier for this SQM in multi-instrument setups</span>
-            </div>
+            {% endfor %}
         </div>
     </div>
 
-    <!-- WeatherLink Section -->
+    <!-- Davis WeatherLink Section - Multi-device -->
     <div class="card">
         <div class="card-header">
-            <h2>WeatherLink Live</h2>
+            <h2>Davis WeatherLink Live</h2>
+            <span class="badge">Up to 3 devices</span>
         </div>
         <div class="card-body">
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="WEATHERLINK_HOST">Host</label>
-                    <input type="text" id="WEATHERLINK_HOST" name="WEATHERLINK_HOST"
-                           value="{{ config.WEATHERLINK_HOST }}"
-                           placeholder="192.168.1.x (leave empty to disable)">
+            <p class="help-text">Configure up to 3 WeatherLink Live devices. Leave Host empty to disable a slot.</p>
+
+            {% for i in range(1, 4) %}
+            <div class="device-slot">
+                <div class="device-slot-header">
+                    <h4>Davis {{ i }}</h4>
+                    <span class="slot-status {% if config['DAVIS_' ~ i ~ '_HOST'] %}enabled{% else %}disabled{% endif %}">
+                        {% if config['DAVIS_' ~ i ~ '_HOST'] %}Configured{% else %}Empty{% endif %}
+                    </span>
                 </div>
-                <div class="form-group">
-                    <label for="WEATHERLINK_INTERVAL">Polling Interval (s)</label>
-                    <input type="number" id="WEATHERLINK_INTERVAL" name="WEATHERLINK_INTERVAL"
-                           value="{{ config.WEATHERLINK_INTERVAL }}"
-                           min="10" max="300"
-                           placeholder="{{ defaults.WEATHERLINK_INTERVAL }}">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="DAVIS_{{ i }}_HOST">Host</label>
+                        <input type="text" id="DAVIS_{{ i }}_HOST" name="DAVIS_{{ i }}_HOST"
+                               value="{{ config['DAVIS_' ~ i ~ '_HOST'] }}"
+                               placeholder="192.168.1.x (leave empty to disable)">
+                    </div>
+                    <div class="form-group">
+                        <label for="DAVIS_{{ i }}_INTERVAL">Polling Interval (s)</label>
+                        <input type="number" id="DAVIS_{{ i }}_INTERVAL" name="DAVIS_{{ i }}_INTERVAL"
+                               value="{{ config['DAVIS_' ~ i ~ '_INTERVAL'] }}"
+                               min="10" max="300"
+                               placeholder="{{ defaults['DAVIS_' ~ i ~ '_INTERVAL'] }}">
+                    </div>
                 </div>
             </div>
-            <div class="form-group">
-                <label for="INSTRUMENT_CODE_WEATHERLINK">Instrument Code</label>
-                <input type="text" id="INSTRUMENT_CODE_WEATHERLINK" name="INSTRUMENT_CODE_WEATHERLINK"
-                       value="{{ config.INSTRUMENT_CODE_WEATHERLINK }}"
-                       placeholder="{{ defaults.INSTRUMENT_CODE_WEATHERLINK }}">
-            </div>
+            {% endfor %}
         </div>
     </div>
 
-    <!-- Cloudwatcher Section -->
+    <!-- Cloudwatcher Section - Multi-device -->
     <div class="card">
         <div class="card-header">
             <h2>AAG Cloudwatcher</h2>
+            <span class="badge">Up to 3 devices</span>
         </div>
         <div class="card-body">
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="CLOUDWATCHER_HOST">CGI Host</label>
-                    <input type="text" id="CLOUDWATCHER_HOST" name="CLOUDWATCHER_HOST"
-                           value="{{ config.CLOUDWATCHER_HOST }}"
-                           placeholder="192.168.1.x (leave empty to disable)">
+            <p class="help-text">Configure up to 3 AAG Cloudwatcher devices. Leave Host empty to disable a slot.</p>
+
+            {% for i in range(1, 4) %}
+            <div class="device-slot">
+                <div class="device-slot-header">
+                    <h4>Cloudwatcher {{ i }}</h4>
+                    <span class="slot-status {% if config['CLOUDWATCHER_' ~ i ~ '_HOST'] %}enabled{% else %}disabled{% endif %}">
+                        {% if config['CLOUDWATCHER_' ~ i ~ '_HOST'] %}Configured{% else %}Empty{% endif %}
+                    </span>
                 </div>
-                <div class="form-group">
-                    <label for="CLOUDWATCHER_INTERVAL">Polling Interval (s)</label>
-                    <input type="number" id="CLOUDWATCHER_INTERVAL" name="CLOUDWATCHER_INTERVAL"
-                           value="{{ config.CLOUDWATCHER_INTERVAL }}"
-                           min="10" max="300"
-                           placeholder="{{ defaults.CLOUDWATCHER_INTERVAL }}">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="CLOUDWATCHER_{{ i }}_HOST">CGI Host</label>
+                        <input type="text" id="CLOUDWATCHER_{{ i }}_HOST" name="CLOUDWATCHER_{{ i }}_HOST"
+                               value="{{ config['CLOUDWATCHER_' ~ i ~ '_HOST'] }}"
+                               placeholder="192.168.1.x (leave empty to disable)">
+                    </div>
+                    <div class="form-group">
+                        <label for="CLOUDWATCHER_{{ i }}_INTERVAL">Polling Interval (s)</label>
+                        <input type="number" id="CLOUDWATCHER_{{ i }}_INTERVAL" name="CLOUDWATCHER_{{ i }}_INTERVAL"
+                               value="{{ config['CLOUDWATCHER_' ~ i ~ '_INTERVAL'] }}"
+                               min="10" max="300"
+                               placeholder="{{ defaults['CLOUDWATCHER_' ~ i ~ '_INTERVAL'] }}">
+                    </div>
                 </div>
             </div>
-            <div class="form-group">
-                <label for="INSTRUMENT_CODE_CLOUDWATCHER">Instrument Code</label>
-                <input type="text" id="INSTRUMENT_CODE_CLOUDWATCHER" name="INSTRUMENT_CODE_CLOUDWATCHER"
-                       value="{{ config.INSTRUMENT_CODE_CLOUDWATCHER }}"
-                       placeholder="{{ defaults.INSTRUMENT_CODE_CLOUDWATCHER }}">
-            </div>
+            {% endfor %}
         </div>
     </div>
 
@@ -162,12 +182,6 @@
                 <input type="url" id="ALLSKY_IMAGE_URL" name="ALLSKY_IMAGE_URL"
                        value="{{ config.ALLSKY_IMAGE_URL }}"
                        placeholder="http://... (optional)">
-            </div>
-            <div class="form-group">
-                <label for="INSTRUMENT_CODE_ALLSKY">Instrument Code</label>
-                <input type="text" id="INSTRUMENT_CODE_ALLSKY" name="INSTRUMENT_CODE_ALLSKY"
-                       value="{{ config.INSTRUMENT_CODE_ALLSKY }}"
-                       placeholder="{{ defaults.INSTRUMENT_CODE_ALLSKY }}">
             </div>
         </div>
     </div>
@@ -232,11 +246,29 @@
                     </select>
                 </div>
             </div>
-            <div class="form-group">
-                <label for="INSTRUMENT_CODE_MQTT_WEATHER">MQTT Weather Instrument Code</label>
-                <input type="text" id="INSTRUMENT_CODE_MQTT_WEATHER" name="INSTRUMENT_CODE_MQTT_WEATHER"
-                       value="{{ config.INSTRUMENT_CODE_MQTT_WEATHER }}"
-                       placeholder="{{ defaults.INSTRUMENT_CODE_MQTT_WEATHER }}">
+        </div>
+    </div>
+
+    <!-- Legacy Instrument Codes -->
+    <div class="card">
+        <div class="card-header">
+            <h2>Legacy Instrument Codes</h2>
+        </div>
+        <div class="card-body">
+            <p class="help-text">These codes are used for MQTT sources and AllSky. Direct device connections use auto-generated codes based on serial numbers.</p>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="INSTRUMENT_CODE_MQTT_WEATHER">MQTT Weather Code</label>
+                    <input type="text" id="INSTRUMENT_CODE_MQTT_WEATHER" name="INSTRUMENT_CODE_MQTT_WEATHER"
+                           value="{{ config.INSTRUMENT_CODE_MQTT_WEATHER }}"
+                           placeholder="{{ defaults.INSTRUMENT_CODE_MQTT_WEATHER }}">
+                </div>
+                <div class="form-group">
+                    <label for="INSTRUMENT_CODE_ALLSKY">AllSky Code</label>
+                    <input type="text" id="INSTRUMENT_CODE_ALLSKY" name="INSTRUMENT_CODE_ALLSKY"
+                           value="{{ config.INSTRUMENT_CODE_ALLSKY }}"
+                           placeholder="{{ defaults.INSTRUMENT_CODE_ALLSKY }}">
+                </div>
             </div>
         </div>
     </div>

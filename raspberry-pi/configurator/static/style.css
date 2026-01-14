@@ -655,6 +655,71 @@ input[type="range"]::-webkit-slider-thumb {
 .log-info { color: var(--text-primary); }
 .log-debug { color: var(--text-muted); }
 
+/* Device Slots (Multi-device support) */
+.device-slot {
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    overflow: hidden;
+}
+
+.device-slot:last-child {
+    margin-bottom: 0;
+}
+
+.device-slot-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background-color: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.device-slot-header h4 {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.device-slot-fields {
+    padding: 1rem;
+}
+
+.device-slot-fields.hidden {
+    display: none;
+}
+
+.slot-status {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.slot-status.enabled {
+    background-color: rgba(63, 185, 80, 0.15);
+    color: var(--accent-green);
+}
+
+.slot-status.disabled {
+    background-color: var(--bg-tertiary);
+    color: var(--text-muted);
+}
+
+/* Badge */
+.badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    background-color: var(--accent-purple);
+    color: white;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
 /* Form Actions */
 .form-actions {
     margin-top: 1rem;

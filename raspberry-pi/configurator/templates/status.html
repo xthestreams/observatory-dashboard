@@ -61,88 +61,104 @@
     </div>
 </div>
 
-<!-- Instruments Grid -->
-<h2 class="section-title">Instruments</h2>
+<!-- SQM Devices -->
+<h2 class="section-title">Sky Quality Meters</h2>
 <div class="instruments-grid">
-
-    <!-- SQM -->
-    <div class="instrument-card {% if config.SQM_HOST %}enabled{% else %}disabled{% endif %}">
+    {% for i in range(1, 4) %}
+    {% set sqm_host = config['SQM_' ~ i ~ '_HOST'] %}
+    <div class="instrument-card {% if sqm_host %}enabled{% else %}disabled{% endif %}">
         <div class="instrument-header">
-            <h3>Sky Quality Meter</h3>
-            <span class="status-indicator" id="sqm-status">
-                <span class="status-dot {% if config.SQM_HOST %}status-gray{% else %}status-off{% endif %}"></span>
-                {% if config.SQM_HOST %}Not tested{% else %}Disabled{% endif %}
+            <h3>SQM {{ i }}</h3>
+            <span class="status-indicator" id="sqm-{{ i }}-status">
+                <span class="status-dot {% if sqm_host %}status-gray{% else %}status-off{% endif %}"></span>
+                {% if sqm_host %}Not tested{% else %}Disabled{% endif %}
             </span>
         </div>
         <div class="instrument-body">
-            {% if config.SQM_HOST %}
+            {% if sqm_host %}
             <div class="info-row">
                 <span class="label">Host:</span>
-                <span class="value">{{ config.SQM_HOST }}:{{ config.SQM_PORT }}</span>
+                <span class="value">{{ sqm_host }}:{{ config['SQM_' ~ i ~ '_PORT'] }}</span>
             </div>
-            <button class="btn btn-sm" onclick="testInstrument('sqm')">Test</button>
-            <div id="sqm-result" class="test-result"></div>
+            <button class="btn btn-sm" onclick="testSqm({{ i }})">Test</button>
+            <div id="sqm-{{ i }}-result" class="test-result"></div>
             {% else %}
             <p class="disabled-text">Not configured</p>
             {% endif %}
         </div>
     </div>
+    {% endfor %}
+</div>
 
-    <!-- WeatherLink -->
-    <div class="instrument-card {% if config.WEATHERLINK_HOST %}enabled{% else %}disabled{% endif %}">
+<!-- Davis WeatherLink Devices -->
+<h2 class="section-title">Davis WeatherLink Live</h2>
+<div class="instruments-grid">
+    {% for i in range(1, 4) %}
+    {% set davis_host = config['DAVIS_' ~ i ~ '_HOST'] %}
+    <div class="instrument-card {% if davis_host %}enabled{% else %}disabled{% endif %}">
         <div class="instrument-header">
-            <h3>WeatherLink Live</h3>
-            <span class="status-indicator" id="weatherlink-status">
-                <span class="status-dot {% if config.WEATHERLINK_HOST %}status-gray{% else %}status-off{% endif %}"></span>
-                {% if config.WEATHERLINK_HOST %}Not tested{% else %}Disabled{% endif %}
+            <h3>Davis {{ i }}</h3>
+            <span class="status-indicator" id="davis-{{ i }}-status">
+                <span class="status-dot {% if davis_host %}status-gray{% else %}status-off{% endif %}"></span>
+                {% if davis_host %}Not tested{% else %}Disabled{% endif %}
             </span>
         </div>
         <div class="instrument-body">
-            {% if config.WEATHERLINK_HOST %}
+            {% if davis_host %}
             <div class="info-row">
                 <span class="label">Host:</span>
-                <span class="value">{{ config.WEATHERLINK_HOST }}</span>
+                <span class="value">{{ davis_host }}</span>
             </div>
             <div class="info-row">
                 <span class="label">Interval:</span>
-                <span class="value">{{ config.WEATHERLINK_INTERVAL }}s</span>
+                <span class="value">{{ config['DAVIS_' ~ i ~ '_INTERVAL'] }}s</span>
             </div>
-            <button class="btn btn-sm" onclick="testInstrument('weatherlink')">Test</button>
-            <div id="weatherlink-result" class="test-result"></div>
+            <button class="btn btn-sm" onclick="testDavis({{ i }})">Test</button>
+            <div id="davis-{{ i }}-result" class="test-result"></div>
             {% else %}
             <p class="disabled-text">Not configured</p>
             {% endif %}
         </div>
     </div>
+    {% endfor %}
+</div>
 
-    <!-- Cloudwatcher -->
-    <div class="instrument-card {% if config.CLOUDWATCHER_HOST %}enabled{% else %}disabled{% endif %}">
+<!-- Cloudwatcher Devices -->
+<h2 class="section-title">AAG Cloudwatcher</h2>
+<div class="instruments-grid">
+    {% for i in range(1, 4) %}
+    {% set cw_host = config['CLOUDWATCHER_' ~ i ~ '_HOST'] %}
+    <div class="instrument-card {% if cw_host %}enabled{% else %}disabled{% endif %}">
         <div class="instrument-header">
-            <h3>AAG Cloudwatcher</h3>
-            <span class="status-indicator" id="cloudwatcher-status">
-                <span class="status-dot {% if config.CLOUDWATCHER_HOST %}status-gray{% else %}status-off{% endif %}"></span>
-                {% if config.CLOUDWATCHER_HOST %}Not tested{% else %}Disabled{% endif %}
+            <h3>Cloudwatcher {{ i }}</h3>
+            <span class="status-indicator" id="cloudwatcher-{{ i }}-status">
+                <span class="status-dot {% if cw_host %}status-gray{% else %}status-off{% endif %}"></span>
+                {% if cw_host %}Not tested{% else %}Disabled{% endif %}
             </span>
         </div>
         <div class="instrument-body">
-            {% if config.CLOUDWATCHER_HOST %}
+            {% if cw_host %}
             <div class="info-row">
                 <span class="label">Host:</span>
-                <span class="value">{{ config.CLOUDWATCHER_HOST }}</span>
+                <span class="value">{{ cw_host }}</span>
             </div>
             <div class="info-row">
                 <span class="label">Interval:</span>
-                <span class="value">{{ config.CLOUDWATCHER_INTERVAL }}s</span>
+                <span class="value">{{ config['CLOUDWATCHER_' ~ i ~ '_INTERVAL'] }}s</span>
             </div>
-            <button class="btn btn-sm" onclick="testInstrument('cloudwatcher')">Test</button>
-            <div id="cloudwatcher-result" class="test-result"></div>
+            <button class="btn btn-sm" onclick="testCloudwatcher({{ i }})">Test</button>
+            <div id="cloudwatcher-{{ i }}-result" class="test-result"></div>
             {% else %}
             <p class="disabled-text">Not configured</p>
             {% endif %}
         </div>
     </div>
+    {% endfor %}
+</div>
 
-    <!-- AllSky -->
+<!-- AllSky -->
+<h2 class="section-title">Other Sources</h2>
+<div class="instruments-grid">
     <div class="instrument-card {% if config.ALLSKY_IMAGE_PATH or config.ALLSKY_IMAGE_URL %}enabled{% else %}disabled{% endif %}">
         <div class="instrument-header">
             <h3>AllSky Camera</h3>
@@ -165,14 +181,13 @@
             </div>
             {% endif %}
             {% if config.ALLSKY_IMAGE_PATH or config.ALLSKY_IMAGE_URL %}
-            <button class="btn btn-sm" onclick="testInstrument('allsky')">Test</button>
+            <button class="btn btn-sm" onclick="testAllsky()">Test</button>
             <div id="allsky-result" class="test-result"></div>
             {% else %}
             <p class="disabled-text">Not configured</p>
             {% endif %}
         </div>
     </div>
-
 </div>
 
 <!-- BOM Imagery -->
@@ -222,12 +237,14 @@
 {% block scripts %}
 <script>
 // Store config for tests
-const currentConfig = {
+const deviceConfig = {
     apiUrl: "{{ config.REMOTE_API_URL }}",
-    sqmHost: "{{ config.SQM_HOST }}",
-    sqmPort: "{{ config.SQM_PORT }}",
-    weatherlinkHost: "{{ config.WEATHERLINK_HOST }}",
-    cloudwatcherHost: "{{ config.CLOUDWATCHER_HOST }}",
+    {% for i in range(1, 4) %}
+    sqm{{ i }}Host: "{{ config['SQM_' ~ i ~ '_HOST'] }}",
+    sqm{{ i }}Port: "{{ config['SQM_' ~ i ~ '_PORT'] }}",
+    davis{{ i }}Host: "{{ config['DAVIS_' ~ i ~ '_HOST'] }}",
+    cloudwatcher{{ i }}Host: "{{ config['CLOUDWATCHER_' ~ i ~ '_HOST'] }}",
+    {% endfor %}
     allskyPath: "{{ config.ALLSKY_IMAGE_PATH }}",
     allskyUrl: "{{ config.ALLSKY_IMAGE_URL }}"
 };
@@ -241,7 +258,7 @@ function testApiConnection() {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
-            url: currentConfig.apiUrl,
+            url: deviceConfig.apiUrl,
             api_key: '****'  // Use stored key
         })
     })
@@ -269,35 +286,18 @@ function testApiConnection() {
     });
 }
 
-function testInstrument(type) {
-    const resultDiv = document.getElementById(`${type}-result`);
-    const statusDiv = document.getElementById(`${type}-status`);
+function testSqm(slot) {
+    const resultDiv = document.getElementById(`sqm-${slot}-result`);
+    const statusDiv = document.getElementById(`sqm-${slot}-status`);
     resultDiv.innerHTML = '<span class="loading">Testing...</span>';
 
-    let endpoint, body;
-    switch(type) {
-        case 'sqm':
-            endpoint = '/api/test/sqm';
-            body = {host: currentConfig.sqmHost, port: parseInt(currentConfig.sqmPort)};
-            break;
-        case 'weatherlink':
-            endpoint = '/api/test/weatherlink';
-            body = {host: currentConfig.weatherlinkHost};
-            break;
-        case 'cloudwatcher':
-            endpoint = '/api/test/cloudwatcher';
-            body = {host: currentConfig.cloudwatcherHost};
-            break;
-        case 'allsky':
-            endpoint = '/api/test/allsky';
-            body = {path: currentConfig.allskyPath, url: currentConfig.allskyUrl};
-            break;
-    }
+    const host = deviceConfig[`sqm${slot}Host`];
+    const port = parseInt(deviceConfig[`sqm${slot}Port`]) || 10001;
 
-    fetch(endpoint, {
+    fetch('/api/test/sqm', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(body)
+        body: JSON.stringify({host, port})
     })
     .then(r => r.json())
     .then(data => {
@@ -306,14 +306,112 @@ function testInstrument(type) {
             resultDiv.innerHTML = `<span class="success">${data.message}</span>`;
             if (data.data) {
                 let preview = '<div class="reading-preview">';
-                for (const [key, value] of Object.entries(data.data)) {
-                    if (value !== null && key !== 'raw') {
-                        preview += `<span>${key}: ${value}</span>`;
-                    }
-                }
+                if (data.data.sky_quality !== undefined) preview += `<span>SQM: ${data.data.sky_quality} mag/arcsec²</span>`;
+                if (data.data.temperature !== undefined) preview += `<span>Temp: ${data.data.temperature}°C</span>`;
                 preview += '</div>';
                 resultDiv.innerHTML += preview;
             }
+        } else {
+            statusDiv.innerHTML = '<span class="status-dot status-red"></span> Error';
+            resultDiv.innerHTML = `<span class="error">${data.message}</span>`;
+        }
+    })
+    .catch(err => {
+        statusDiv.innerHTML = '<span class="status-dot status-red"></span> Error';
+        resultDiv.innerHTML = `<span class="error">${err}</span>`;
+    });
+}
+
+function testDavis(slot) {
+    const resultDiv = document.getElementById(`davis-${slot}-result`);
+    const statusDiv = document.getElementById(`davis-${slot}-status`);
+    resultDiv.innerHTML = '<span class="loading">Testing...</span>';
+
+    const host = deviceConfig[`davis${slot}Host`];
+
+    fetch('/api/test/weatherlink', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({host})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            statusDiv.innerHTML = '<span class="status-dot status-green"></span> Connected';
+            resultDiv.innerHTML = `<span class="success">${data.message}</span>`;
+            if (data.data) {
+                let preview = '<div class="reading-preview">';
+                if (data.data.temperature_c !== undefined) preview += `<span>Temp: ${data.data.temperature_c}°C</span>`;
+                if (data.data.humidity !== undefined) preview += `<span>Humidity: ${data.data.humidity}%</span>`;
+                if (data.data.pressure_hpa !== undefined) preview += `<span>Pressure: ${data.data.pressure_hpa} hPa</span>`;
+                preview += '</div>';
+                resultDiv.innerHTML += preview;
+            }
+        } else {
+            statusDiv.innerHTML = '<span class="status-dot status-red"></span> Error';
+            resultDiv.innerHTML = `<span class="error">${data.message}</span>`;
+        }
+    })
+    .catch(err => {
+        statusDiv.innerHTML = '<span class="status-dot status-red"></span> Error';
+        resultDiv.innerHTML = `<span class="error">${err}</span>`;
+    });
+}
+
+function testCloudwatcher(slot) {
+    const resultDiv = document.getElementById(`cloudwatcher-${slot}-result`);
+    const statusDiv = document.getElementById(`cloudwatcher-${slot}-status`);
+    resultDiv.innerHTML = '<span class="loading">Testing...</span>';
+
+    const host = deviceConfig[`cloudwatcher${slot}Host`];
+
+    fetch('/api/test/cloudwatcher', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({host})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            statusDiv.innerHTML = '<span class="status-dot status-green"></span> Connected';
+            resultDiv.innerHTML = `<span class="success">${data.message}</span>`;
+            if (data.data) {
+                let preview = '<div class="reading-preview">';
+                if (data.data.sky_temp !== undefined) preview += `<span>Sky: ${data.data.sky_temp}°C</span>`;
+                if (data.data.ambient_temp !== undefined) preview += `<span>Ambient: ${data.data.ambient_temp}°C</span>`;
+                preview += `<span>Safe: ${data.data.cloud_safe && data.data.rain_safe ? 'Yes' : 'No'}</span>`;
+                preview += '</div>';
+                resultDiv.innerHTML += preview;
+            }
+        } else {
+            statusDiv.innerHTML = '<span class="status-dot status-red"></span> Error';
+            resultDiv.innerHTML = `<span class="error">${data.message}</span>`;
+        }
+    })
+    .catch(err => {
+        statusDiv.innerHTML = '<span class="status-dot status-red"></span> Error';
+        resultDiv.innerHTML = `<span class="error">${err}</span>`;
+    });
+}
+
+function testAllsky() {
+    const resultDiv = document.getElementById('allsky-result');
+    const statusDiv = document.getElementById('allsky-status');
+    resultDiv.innerHTML = '<span class="loading">Testing...</span>';
+
+    fetch('/api/test/allsky', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            path: deviceConfig.allskyPath,
+            url: deviceConfig.allskyUrl
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            statusDiv.innerHTML = '<span class="status-dot status-green"></span> Available';
+            resultDiv.innerHTML = `<span class="success">${data.message}</span>`;
         } else {
             statusDiv.innerHTML = '<span class="status-dot status-red"></span> Error';
             resultDiv.innerHTML = `<span class="error">${data.message}</span>`;

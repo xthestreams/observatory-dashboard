@@ -138,17 +138,44 @@ def api_status():
     config = load_env()
     service = get_service_status()
 
+    # Build multi-device status info
+    sqm_devices = []
+    davis_devices = []
+    cloudwatcher_devices = []
+
+    for i in range(1, 4):
+        sqm_host = config.get(f"SQM_{i}_HOST", "")
+        if sqm_host:
+            sqm_devices.append({
+                "slot": i,
+                "host": sqm_host,
+                "port": config.get(f"SQM_{i}_PORT", "10001"),
+            })
+
+        davis_host = config.get(f"DAVIS_{i}_HOST", "")
+        if davis_host:
+            davis_devices.append({
+                "slot": i,
+                "host": davis_host,
+                "interval": config.get(f"DAVIS_{i}_INTERVAL", "30"),
+            })
+
+        cw_host = config.get(f"CLOUDWATCHER_{i}_HOST", "")
+        if cw_host:
+            cloudwatcher_devices.append({
+                "slot": i,
+                "host": cw_host,
+                "interval": config.get(f"CLOUDWATCHER_{i}_INTERVAL", "30"),
+            })
+
     return jsonify({
         "service": service,
         "config": {
             "api_url": config.get("REMOTE_API_URL", ""),
             "api_key_set": bool(config.get("API_KEY")),
-            "sqm_enabled": bool(config.get("SQM_HOST")),
-            "sqm_host": config.get("SQM_HOST", ""),
-            "weatherlink_enabled": bool(config.get("WEATHERLINK_HOST")),
-            "weatherlink_host": config.get("WEATHERLINK_HOST", ""),
-            "cloudwatcher_enabled": bool(config.get("CLOUDWATCHER_HOST")),
-            "cloudwatcher_host": config.get("CLOUDWATCHER_HOST", ""),
+            "sqm_devices": sqm_devices,
+            "davis_devices": davis_devices,
+            "cloudwatcher_devices": cloudwatcher_devices,
             "allsky_enabled": bool(config.get("ALLSKY_IMAGE_PATH") or config.get("ALLSKY_IMAGE_URL")),
             "bom_enabled": config.get("BOM_SATELLITE_ENABLED", "").lower() == "true",
             "push_interval": config.get("PUSH_INTERVAL", "60"),
