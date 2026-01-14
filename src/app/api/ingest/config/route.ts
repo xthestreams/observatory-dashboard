@@ -83,7 +83,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Store the config push timestamp in site_config for dashboard display
-    const { error: configError } = await supabase
+    console.log("Attempting site_config upsert with key: collector_last_config");
+    const { data: upsertData, error: configError } = await supabase
       .from("site_config")
       .upsert({
         key: "collector_last_config",
@@ -95,10 +96,13 @@ export async function POST(request: NextRequest) {
         updated_at: timestamp,
       }, {
         onConflict: "key",
-      });
+      })
+      .select();
 
     if (configError) {
       console.error("Error storing config timestamp:", configError);
+    } else {
+      console.log("site_config upsert result:", JSON.stringify(upsertData));
     }
 
     return NextResponse.json({
