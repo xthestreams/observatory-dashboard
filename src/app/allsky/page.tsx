@@ -222,7 +222,7 @@ export default function AllSkyPage() {
                 width: containerSize,
                 height: containerSize,
                 opacity: config.opacity,
-                transform: `scale(${config.scaleX}, ${config.scaleY})`,
+                transform: `translate(-50%, -50%) scale(${config.scaleX}, ${config.scaleY})`,
               }}
             />
           )}
