@@ -95,6 +95,23 @@
   transform-origin: center center;
 }
 
+/* Wrapper for VirtualSky that handles centering without being affected
+   by VirtualSky setting position:relative on its container */
+.overlayWrapper {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  transform-origin: center center;
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* Re-enable pointer events on the actual VirtualSky container */
+.overlayWrapper > div {
+  pointer-events: auto;
+}
+
 .loading {
   position: absolute;
   top: 50%;

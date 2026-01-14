@@ -215,23 +215,25 @@ export default function AllSkyPage() {
           />
           {showOverlay && scriptsLoaded && (
             <div
-              ref={containerRef}
-              id="virtualsky-container"
-              className={styles.overlay}
+              className={styles.overlayWrapper}
               style={{
                 width: containerSize,
                 height: containerSize,
                 opacity: config.opacity,
-                // Use margin-based centering instead of transform translate
-                // to avoid conflicts with VirtualSky's internal positioning
-                marginLeft: -containerSize / 2,
-                marginTop: -containerSize / 2,
                 transform: config.scaleX !== 1 || config.scaleY !== 1
                   ? `scale(${config.scaleX}, ${config.scaleY})`
                   : undefined,
-                transformOrigin: "center center",
               }}
-            />
+            >
+              <div
+                ref={containerRef}
+                id="virtualsky-container"
+                style={{
+                  width: containerSize,
+                  height: containerSize,
+                }}
+              />
+            </div>
           )}
           {showOverlay && !scriptsLoaded && (
             <div className={styles.loading}>Loading star overlay...</div>
