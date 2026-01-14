@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase";
 import {
-  fetchFailedInstruments,
   fetchLatestInstrumentReadings,
 } from "@/lib/instruments";
 import { getTelemetryHealth, getAggregatedConditions } from "@/lib/telemetryKV";
-import { WeatherData, HistoricalReading, ApiResponse, CloudCondition, RainCondition, WindCondition, DayCondition } from "@/types/weather";
+import { WeatherData, HistoricalReading, ApiResponse, CloudCondition, RainCondition, WindCondition, DayCondition, FailedInstrument, InstrumentReading } from "@/types/weather";
 
 // Force dynamic rendering - this route fetches live data
 export const dynamic = "force-dynamic";
@@ -250,25 +249,58 @@ export async function GET() {
       }
     }
 
+    // Get telemetry health from KV state FIRST
+    // This is the source of truth for instrument health (from collector)
+    const telemetryHealth = await getTelemetryHealth();
+
     // Fetch per-instrument readings for the detail modal
-    let instrumentReadings;
-    let failedInstruments;
+    let instrumentReadings: Record<string, InstrumentReading> | undefined;
+    let failedInstruments: FailedInstrument[] | undefined;
     let instrumentCount = 1;
 
     try {
-      instrumentReadings = await fetchLatestInstrumentReadings(supabase);
-      failedInstruments = await fetchFailedInstruments(supabase);
+      // Fetch readings from Supabase (for data values)
+      const rawReadings = await fetchLatestInstrumentReadings(supabase);
+
+      // Override status with collector-reported health
+      // The collector is the source of truth, not Supabase staleness
+      instrumentReadings = {};
+      for (const [code, reading] of Object.entries(rawReadings)) {
+        // Find this instrument in telemetryHealth
+        const isOffline = telemetryHealth.offlineInstruments.some(i => i.code === code);
+        const isDegraded = telemetryHealth.degradedInstruments.some(i => i.code === code);
+
+        // Override the status based on collector-reported health
+        let status: "active" | "degraded" | "offline" | "maintenance" = "active";
+        if (isOffline) {
+          status = "offline";
+        } else if (isDegraded) {
+          status = "degraded";
+        }
+
+        instrumentReadings[code] = {
+          ...reading,
+          status,
+        };
+      }
+
+      // Derive failedInstruments from telemetryHealth (not Supabase)
+      failedInstruments = [
+        ...telemetryHealth.offlineInstruments,
+        ...telemetryHealth.degradedInstruments,
+      ];
+
       instrumentCount = Object.keys(instrumentReadings).length || 1;
     } catch (instError) {
       // Instrument tables might not exist yet - that's OK
       console.error("Error fetching instruments (may not exist yet):", instError);
       instrumentReadings = undefined;
-      failedInstruments = undefined;
+      // Still use telemetryHealth for failedInstruments even if DB query fails
+      failedInstruments = [
+        ...telemetryHealth.offlineInstruments,
+        ...telemetryHealth.degradedInstruments,
+      ];
     }
-
-    // Get telemetry health from KV state (no Supabase query needed)
-    // This is updated by heartbeat and ingest endpoints
-    const telemetryHealth = await getTelemetryHealth();
 
     // Build response
     const response: ApiResponse = {
