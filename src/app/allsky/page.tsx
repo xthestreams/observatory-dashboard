@@ -38,15 +38,14 @@ const DEFAULT_CONFIG: VirtualSkyConfig = {
   scaleY: 1.0,
 };
 
-// Extend jQuery type for VirtualSky
-interface JQueryStatic {
+// VirtualSky uses stuquery (S) not jQuery ($)
+interface StuQueryStatic {
   virtualsky: (opts: Record<string, unknown>) => unknown;
 }
 
 declare global {
   interface Window {
-    jQuery?: JQueryStatic;
-    $?: JQueryStatic;
+    S?: StuQueryStatic;
   }
 }
 
@@ -96,34 +95,32 @@ export default function AllSkyPage() {
     loadConfig();
   }, []);
 
-  // Load jQuery and VirtualSky scripts
+  // Load stuquery and VirtualSky scripts (same as AllSky software)
   useEffect(() => {
     if (scriptsLoaded) return;
 
     // Check if already loaded
-    if (typeof window !== "undefined" && window.$ && "virtualsky" in window.$) {
+    if (typeof window !== "undefined" && window.S && "virtualsky" in window.S) {
       setScriptsLoaded(true);
       return;
     }
 
-    // Load jQuery first, then VirtualSky
+    // Load stuquery first, then VirtualSky
     const loadScripts = async () => {
-      // Load jQuery if not present
-      if (!window.jQuery) {
-        await new Promise<void>((resolve, reject) => {
-          const jqueryScript = document.createElement("script");
-          jqueryScript.src = "https://code.jquery.com/jquery-3.7.1.min.js";
-          jqueryScript.async = true;
-          jqueryScript.onload = () => resolve();
-          jqueryScript.onerror = () => reject(new Error("Failed to load jQuery"));
-          document.head.appendChild(jqueryScript);
-        });
-      }
+      // Load stuquery (lightweight jQuery alternative used by VirtualSky)
+      await new Promise<void>((resolve, reject) => {
+        const stuqueryScript = document.createElement("script");
+        stuqueryScript.src = "https://slowe.github.io/VirtualSky/stuquery.min.js";
+        stuqueryScript.async = true;
+        stuqueryScript.onload = () => resolve();
+        stuqueryScript.onerror = () => reject(new Error("Failed to load stuquery"));
+        document.head.appendChild(stuqueryScript);
+      });
 
       // Load VirtualSky
       await new Promise<void>((resolve, reject) => {
         const vsScript = document.createElement("script");
-        vsScript.src = "https://virtualsky.lco.global/virtualsky.min.js";
+        vsScript.src = "https://slowe.github.io/VirtualSky/virtualsky.min.js";
         vsScript.async = true;
         vsScript.onload = () => resolve();
         vsScript.onerror = () => reject(new Error("Failed to load VirtualSky"));
@@ -136,11 +133,22 @@ export default function AllSkyPage() {
     loadScripts().catch((err) => console.error(err));
   }, [scriptsLoaded]);
 
+  // Convert decimal degrees to VirtualSky format (e.g., -31.25 -> "31.25S")
+  const formatLatitude = (lat: number): string => {
+    const abs = Math.abs(lat);
+    return lat >= 0 ? `${abs}N` : `${abs}S`;
+  };
+
+  const formatLongitude = (lon: number): string => {
+    const abs = Math.abs(lon);
+    return lon >= 0 ? `${abs}E` : `${abs}W`;
+  };
+
   // Initialize VirtualSky when scripts are loaded
   useEffect(() => {
     if (!scriptsLoaded || !containerRef.current || !showOverlay || containerSize === 0) return;
 
-    if (!window.$ || !window.$.virtualsky) {
+    if (!window.S || !window.S.virtualsky) {
       console.error("VirtualSky not available");
       return;
     }
@@ -148,13 +156,13 @@ export default function AllSkyPage() {
     // Clear previous instance
     containerRef.current.innerHTML = "";
 
-    // Create VirtualSky instance using jQuery with explicit dimensions
-    vsRef.current = window.$.virtualsky({
+    // Create VirtualSky instance using S.virtualsky (stuquery)
+    vsRef.current = window.S.virtualsky({
       id: "virtualsky-container",
       width: containerSize,
       height: containerSize,
-      latitude: siteConfig.latitude,
-      longitude: siteConfig.longitude,
+      latitude: formatLatitude(siteConfig.latitude),
+      longitude: formatLongitude(siteConfig.longitude),
       az: config.azOffset,
       projection: config.projection,
       constellations: config.showConstellations,
@@ -171,24 +179,13 @@ export default function AllSkyPage() {
       keyboard: false,
       mouse: true,
       live: true,
-      fontsize: "12px",
-      fontfamily: "Inter, sans-serif",
+      fontsize: "14px",
       gridlines_az: false,
       gridlines_eq: false,
       gridlines_gal: false,
       negative: false,
       ecliptic: false,
       ground: false,
-      // Colors for dark theme
-      colour: {
-        txt: "rgba(255,255,255,0.8)",
-        constellation: "rgba(100,180,255,0.7)",
-        constellationboundary: "rgba(100,100,100,0.3)",
-        cardinal: "rgba(255,200,100,0.9)",
-        planet: "rgba(255,200,100,1)",
-        planetlabel: "rgba(255,200,100,0.8)",
-        meridian: "rgba(100,180,255,0.4)",
-      },
     });
   }, [scriptsLoaded, showOverlay, config, containerSize]);
 

@@ -64,36 +64,44 @@ export default function SetupPage() {
     loadConfig();
   }, []);
 
-  // Load jQuery and VirtualSky scripts for preview
+  // Convert decimal degrees to VirtualSky format
+  const formatLatitude = (lat: number): string => {
+    const abs = Math.abs(lat);
+    return lat >= 0 ? `${abs}N` : `${abs}S`;
+  };
+
+  const formatLongitude = (lon: number): string => {
+    const abs = Math.abs(lon);
+    return lon >= 0 ? `${abs}E` : `${abs}W`;
+  };
+
+  // Load stuquery and VirtualSky scripts for preview
   useEffect(() => {
     if (scriptLoaded || !previewEnabled) return;
 
     // Check if already loaded
-    const win = window as Window & { $?: { virtualsky?: unknown } };
-    if (typeof window !== "undefined" && win.$?.virtualsky) {
+    const win = window as Window & { S?: { virtualsky?: unknown } };
+    if (typeof window !== "undefined" && win.S?.virtualsky) {
       setScriptLoaded(true);
       return;
     }
 
-    // Load jQuery first, then VirtualSky
+    // Load stuquery first, then VirtualSky
     const loadScripts = async () => {
-      // Load jQuery if not present
-      const jqueryWin = window as Window & { jQuery?: unknown };
-      if (!jqueryWin.jQuery) {
-        await new Promise<void>((resolve, reject) => {
-          const jqueryScript = document.createElement("script");
-          jqueryScript.src = "https://code.jquery.com/jquery-3.7.1.min.js";
-          jqueryScript.async = true;
-          jqueryScript.onload = () => resolve();
-          jqueryScript.onerror = () => reject(new Error("Failed to load jQuery"));
-          document.head.appendChild(jqueryScript);
-        });
-      }
+      // Load stuquery
+      await new Promise<void>((resolve, reject) => {
+        const stuqueryScript = document.createElement("script");
+        stuqueryScript.src = "https://slowe.github.io/VirtualSky/stuquery.min.js";
+        stuqueryScript.async = true;
+        stuqueryScript.onload = () => resolve();
+        stuqueryScript.onerror = () => reject(new Error("Failed to load stuquery"));
+        document.head.appendChild(stuqueryScript);
+      });
 
       // Load VirtualSky
       await new Promise<void>((resolve, reject) => {
         const vsScript = document.createElement("script");
-        vsScript.src = "https://virtualsky.lco.global/virtualsky.min.js";
+        vsScript.src = "https://slowe.github.io/VirtualSky/virtualsky.min.js";
         vsScript.async = true;
         vsScript.onload = () => resolve();
         vsScript.onerror = () => reject(new Error("Failed to load VirtualSky"));
@@ -115,13 +123,13 @@ export default function SetupPage() {
 
     container.innerHTML = "";
 
-    const win = window as Window & { $?: { virtualsky: (opts: Record<string, unknown>) => unknown } };
-    if (!win.$?.virtualsky) return;
+    const win = window as Window & { S?: { virtualsky: (opts: Record<string, unknown>) => unknown } };
+    if (!win.S?.virtualsky) return;
 
-    win.$.virtualsky({
+    win.S.virtualsky({
       id: "preview-container",
-      latitude: siteConfig.latitude,
-      longitude: siteConfig.longitude,
+      latitude: formatLatitude(siteConfig.latitude),
+      longitude: formatLongitude(siteConfig.longitude),
       az: config.azOffset,
       projection: config.projection,
       constellations: config.showConstellations,
