@@ -350,7 +350,7 @@ def get_sqm_serial(sock) -> Optional[str]:
     Query SQM unit information to get serial number.
     Command 'ix' returns unit info including serial number.
     Response format: i,00000002,00000003,00000001,00000413
-    The second field is the serial number.
+    The 5th field (index 4) is the serial number.
     """
     try:
         sock.sendall(b"ix")
@@ -367,8 +367,8 @@ def get_sqm_serial(sock) -> Optional[str]:
 
         if response_str.startswith("i,"):
             parts = response_str.split(",")
-            if len(parts) >= 2:
-                serial = parts[1].strip().lstrip("0") or "0"
+            if len(parts) >= 5:
+                serial = parts[4].strip().lstrip("0") or "0"
                 return serial
     except Exception as e:
         logger.warning(f"Failed to get SQM serial: {e}")
