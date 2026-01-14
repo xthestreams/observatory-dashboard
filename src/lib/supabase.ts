@@ -20,7 +20,18 @@ export function createServerClient(): SupabaseClient {
 export function createServiceClient(): SupabaseClient {
   return createClient(
     process.env.SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_KEY!
+    process.env.SUPABASE_SERVICE_KEY!,
+    {
+      global: {
+        headers: {
+          // Disable PostgREST schema cache
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+        },
+      },
+      db: {
+        schema: "public",
+      },
+    }
   );
 }
 
