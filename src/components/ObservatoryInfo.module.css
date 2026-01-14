@@ -31,6 +31,62 @@
   letter-spacing: 0.05em;
 }
 
+/* Telemetry Status */
+.telemetryStatus {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.statusIcon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.statusText {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #e5e5e5;
+}
+
+.statusDetail {
+  font-size: 0.75rem;
+  color: #888;
+  margin-left: 1.5rem;
+}
+
+.failedInstrument {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.5rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  margin-left: 1rem;
+}
+
+.failedIcon {
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.failedName {
+  font-size: 0.8rem;
+  color: #ccc;
+  flex: 1;
+}
+
+.failedTime {
+  font-size: 0.7rem;
+  color: #888;
+}
+
 /* Location Grid */
 .locationGrid {
   display: grid;

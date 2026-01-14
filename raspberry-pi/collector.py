@@ -959,6 +959,110 @@ def push_data():
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# CONFIG PUSHER - Tell server what instruments are expected
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def get_collector_id() -> str:
+    """Generate a unique collector ID based on hostname."""
+    import socket
+    hostname = socket.gethostname()
+    return f"pi-{hostname}"
+
+
+def build_expected_instruments() -> list:
+    """
+    Build list of expected instruments from current config.
+    Note: instrument_code is determined at runtime after connecting to devices
+    (e.g., SQM serial numbers), so we use host-based codes initially.
+    These will be updated when devices actually report data.
+    """
+    instruments = []
+
+    # SQM devices
+    for device in CONFIG["sqm_devices"]:
+        instruments.append({
+            "code": f"sqm-{device['host'].replace('.', '-')}",
+            "type": "sqm",
+            "host": device["host"],
+            "slot": device["slot"],
+        })
+
+    # Davis WeatherLink devices
+    for device in CONFIG["davis_devices"]:
+        instruments.append({
+            "code": f"davis-{device['host'].replace('.', '-')}",
+            "type": "weather_station",
+            "host": device["host"],
+            "slot": device["slot"],
+        })
+
+    # Cloudwatcher devices
+    for device in CONFIG["cloudwatcher_devices"]:
+        instruments.append({
+            "code": f"cw-{device['host'].replace('.', '-')}",
+            "type": "cloudwatcher",
+            "host": device["host"],
+            "slot": device["slot"],
+        })
+
+    return instruments
+
+
+def push_config():
+    """
+    Push instrument configuration to the server.
+    This tells the server which instruments are expected to report data.
+    Runs on startup and periodically to keep the server in sync.
+    """
+    api_url = CONFIG["remote_api"]
+    api_key = CONFIG["api_key"]
+
+    if not api_key:
+        logger.warning("No API key, config push disabled")
+        return
+
+    collector_id = get_collector_id()
+    config_interval = 3600  # Push config every hour
+
+    logger.info(f"Starting config pusher, collector_id={collector_id}")
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+
+    while True:
+        try:
+            instruments = build_expected_instruments()
+
+            payload = {
+                "collector_id": collector_id,
+                "instruments": instruments,
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+
+            response = requests.post(
+                f"{api_url}/config",
+                json=payload,
+                headers=headers,
+                timeout=30,
+            )
+
+            if response.ok:
+                result = response.json()
+                logger.info(f"Config pushed: {result.get('instruments_registered', 0)} instruments registered")
+            else:
+                logger.warning(f"Config push failed: {response.status_code} - {response.text}")
+
+        except requests.RequestException as e:
+            logger.error(f"Config push error: {e}")
+        except Exception as e:
+            logger.error(f"Unexpected config push error: {e}")
+
+        time.sleep(config_interval)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # MAIN
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1022,8 +1126,9 @@ def main():
         )
         threads.append(t)
 
-    # Add data pusher and BOM imagery threads
+    # Add data pusher, config pusher, and BOM imagery threads
     threads.append(threading.Thread(target=push_data, daemon=True, name="pusher"))
+    threads.append(threading.Thread(target=push_config, daemon=True, name="config-pusher"))
     threads.append(threading.Thread(target=push_bom_imagery, daemon=True, name="bom-imagery"))
 
     for t in threads:

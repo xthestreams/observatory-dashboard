@@ -10,6 +10,7 @@ import {
   InstrumentReading,
   FailedInstrument,
   InstrumentStatus,
+  TelemetryHealth,
 } from "@/types/weather";
 
 /**
@@ -347,4 +348,91 @@ export function getStatusIcon(status: InstrumentStatus): string {
     default:
       return "?";
   }
+}
+
+/**
+ * Fetch overall telemetry health status
+ * Compares expected instruments (from Pi config) against actual status
+ */
+export async function fetchTelemetryHealth(
+  supabase: SupabaseClient
+): Promise<TelemetryHealth> {
+  // Fetch all expected instruments
+  const { data: instruments, error: instError } = await supabase
+    .from("instruments")
+    .select("code, name, status, last_reading_at, consecutive_outliers, expected")
+    .eq("expected", true);
+
+  if (instError) {
+    console.error("Error fetching instruments for health:", instError);
+    throw instError;
+  }
+
+  // Fetch last config update timestamp
+  const { data: configData } = await supabase
+    .from("site_config")
+    .select("value")
+    .eq("key", "collector_last_config")
+    .single();
+
+  const lastConfigUpdate = configData?.value?.timestamp || null;
+
+  // Compute effective status for each instrument
+  const now = Date.now();
+  const staleThresholdMs = 15 * 60 * 1000; // 15 minutes
+
+  const degradedInstruments: FailedInstrument[] = [];
+  const offlineInstruments: FailedInstrument[] = [];
+  let activeCount = 0;
+
+  for (const inst of instruments || []) {
+    // Compute effective status based on staleness
+    let effectiveStatus = inst.status;
+
+    if (inst.status !== "offline" && inst.status !== "maintenance") {
+      if (inst.last_reading_at) {
+        const lastReading = new Date(inst.last_reading_at).getTime();
+        if (now - lastReading > staleThresholdMs) {
+          effectiveStatus = "offline";
+        }
+      } else {
+        effectiveStatus = "offline";
+      }
+    }
+
+    const failedInst: FailedInstrument = {
+      code: inst.code,
+      name: inst.name,
+      status: effectiveStatus as "degraded" | "offline",
+      lastReadingAt: inst.last_reading_at,
+      consecutiveOutliers: inst.consecutive_outliers || 0,
+    };
+
+    if (effectiveStatus === "offline") {
+      offlineInstruments.push(failedInst);
+    } else if (effectiveStatus === "degraded") {
+      degradedInstruments.push(failedInst);
+    } else if (effectiveStatus === "active") {
+      activeCount++;
+    }
+  }
+
+  const expectedCount = instruments?.length || 0;
+
+  // Determine overall status
+  let status: TelemetryHealth["status"] = "operational";
+  if (offlineInstruments.length > 0) {
+    status = expectedCount > 0 && activeCount === 0 ? "offline" : "degraded";
+  } else if (degradedInstruments.length > 0) {
+    status = "degraded";
+  }
+
+  return {
+    status,
+    expectedCount,
+    activeCount,
+    degradedInstruments,
+    offlineInstruments,
+    lastConfigUpdate,
+  };
 }

@@ -9,6 +9,7 @@ import {
   InstrumentReading,
   FailedInstrument,
   MetricName,
+  TelemetryHealth,
 } from "@/types/weather";
 import {
   ConditionIndicator,
@@ -46,6 +47,7 @@ export default function Dashboard() {
   // Multi-instrument state
   const [instrumentReadings, setInstrumentReadings] = useState<Record<string, InstrumentReading>>({});
   const [failedInstruments, setFailedInstruments] = useState<FailedInstrument[]>([]);
+  const [telemetryHealth, setTelemetryHealth] = useState<TelemetryHealth | null>(null);
   const [selectedMetric, setSelectedMetric] = useState<MetricName | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
@@ -65,6 +67,7 @@ export default function Dashboard() {
         setSqmHistoryByInstrument(json.sqmHistoryByInstrument || {});
         setInstrumentReadings(json.instrumentReadings || {});
         setFailedInstruments(json.failedInstruments || []);
+        setTelemetryHealth(json.telemetryHealth || null);
         setLastUpdate(new Date());
       }
     } catch (err) {
@@ -159,7 +162,7 @@ export default function Dashboard() {
               </div>
             )}
           </div>
-          <ObservatoryInfo />
+          <ObservatoryInfo telemetryHealth={telemetryHealth} />
         </section>
 
         {/* Astronomy - Sun/Moon Data */}

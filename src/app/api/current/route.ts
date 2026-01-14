@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase";
 import {
   fetchFailedInstruments,
   fetchLatestInstrumentReadings,
+  fetchTelemetryHealth,
 } from "@/lib/instruments";
 import { WeatherData, HistoricalReading, ApiResponse, CloudCondition, RainCondition, WindCondition, DayCondition } from "@/types/weather";
 
@@ -213,17 +214,20 @@ export async function GET() {
     // Fetch per-instrument readings for the detail modal
     let instrumentReadings;
     let failedInstruments;
+    let telemetryHealth;
     let instrumentCount = 1;
 
     try {
       instrumentReadings = await fetchLatestInstrumentReadings(supabase);
       failedInstruments = await fetchFailedInstruments(supabase);
+      telemetryHealth = await fetchTelemetryHealth(supabase);
       instrumentCount = Object.keys(instrumentReadings).length || 1;
     } catch (instError) {
       // Instrument tables might not exist yet - that's OK
       console.error("Error fetching instruments (may not exist yet):", instError);
       instrumentReadings = undefined;
       failedInstruments = undefined;
+      telemetryHealth = undefined;
     }
 
     // Build response
@@ -233,6 +237,7 @@ export async function GET() {
       sqmHistoryByInstrument: Object.keys(sqmHistoryByInstrument).length > 0 ? sqmHistoryByInstrument : undefined,
       instrumentReadings,
       failedInstruments,
+      telemetryHealth,
       instrumentCount,
     };
 

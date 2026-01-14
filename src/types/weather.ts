@@ -105,6 +105,18 @@ export interface FailedInstrument {
 }
 
 /**
+ * Overall telemetry health status for the Observatory widget
+ */
+export interface TelemetryHealth {
+  status: "operational" | "degraded" | "offline";
+  expectedCount: number;
+  activeCount: number;
+  degradedInstruments: FailedInstrument[];
+  offlineInstruments: FailedInstrument[];
+  lastConfigUpdate: string | null;
+}
+
+/**
  * API response with multi-instrument support
  */
 export interface ApiResponse {
@@ -122,6 +134,9 @@ export interface ApiResponse {
 
   // Failed instruments (for alert banner)
   failedInstruments?: FailedInstrument[];
+
+  // Overall telemetry health (for Observatory widget)
+  telemetryHealth?: TelemetryHealth;
 
   // Metadata
   instrumentCount?: number;
