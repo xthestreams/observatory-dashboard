@@ -123,11 +123,11 @@ export default function ForecastPanel({ latitude, longitude }: ForecastPanelProp
 
         const data = await response.json();
 
-        // Process hourly data - get next 12 hours
+        // Process hourly data - get next 8 hours
         const now = new Date();
         const hourlyData: HourlyForecast[] = [];
 
-        for (let i = 0; i < data.hourly.time.length && hourlyData.length < 12; i++) {
+        for (let i = 0; i < data.hourly.time.length && hourlyData.length < 8; i++) {
           const forecastTime = new Date(data.hourly.time[i]);
           if (forecastTime >= now) {
             hourlyData.push({
@@ -197,7 +197,7 @@ export default function ForecastPanel({ latitude, longitude }: ForecastPanelProp
     <div className={styles.container}>
       {/* Hourly Detail Section */}
       <div className={styles.hourlySection}>
-        <div className={styles.sectionHeader}>Next 12 Hours</div>
+        <div className={styles.sectionHeader}>Next 8 Hours</div>
         <div className={styles.hourlyGrid}>
           {hourlyForecast.map((hour, idx) => (
             <div key={hour.time} className={`${styles.hourCard} ${idx === 0 ? styles.currentHour : ""}`}>

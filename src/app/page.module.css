@@ -196,21 +196,9 @@
   display: block;
 }
 
-/* Forecast - spans 2 columns on desktop */
+/* Forecast - single column */
 .forecastPanel {
-  grid-column: span 2;
-}
-
-@media (max-width: 1200px) {
-  .forecastPanel {
-    grid-column: span 2;
-  }
-}
-
-@media (max-width: 600px) {
-  .forecastPanel {
-    grid-column: span 1;
-  }
+  grid-column: span 1;
 }
 
 /* Weather - spans 4 columns on desktop */
