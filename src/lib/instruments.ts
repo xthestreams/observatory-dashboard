@@ -216,7 +216,7 @@ export async function fetchLatestInstrumentReadings(
       temperature, humidity, pressure, dewpoint, wind_speed, wind_gust,
       wind_direction, rain_rate, sky_temp, ambient_temp, sky_quality,
       sqm_temperature, cloud_condition, rain_condition, wind_condition, day_condition,
-      instruments!inner(id, code, name, instrument_type, status)
+      instruments!inner(id, code, name, instrument_type, status, last_reading_at)
     `)
     .order("created_at", { ascending: false });
 
@@ -231,14 +231,18 @@ export async function fetchLatestInstrumentReadings(
 
   for (const row of allReadings || []) {
     // With !inner join, instruments is a single object but TypeScript may infer as array
-    const inst = row.instruments as unknown as { id: string; code: string; name: string; instrument_type: string; status: string } | null;
+    const inst = row.instruments as unknown as { id: string; code: string; name: string; instrument_type: string; status: string; last_reading_at: string | null } | null;
     if (!inst || seenInstruments.has(inst.code)) {
       continue;
     }
     seenInstruments.add(inst.code);
 
+    // Use the instrument's last_reading_at which is updated on each ingest
+    // Fall back to the reading's created_at if last_reading_at is not set
+    const lastReadingAt = inst.last_reading_at || row.created_at;
+
     // Compute effective status based on staleness
-    const effectiveStatus = computeEffectiveStatus(inst.status, row.created_at);
+    const effectiveStatus = computeEffectiveStatus(inst.status, lastReadingAt);
 
     readings[inst.code] = {
       instrumentId: inst.id,
@@ -248,7 +252,7 @@ export async function fetchLatestInstrumentReadings(
       status: effectiveStatus,
       isOutlier: row.is_outlier,
       outlierReason: row.outlier_reason,
-      lastReadingAt: row.created_at,
+      lastReadingAt,
       temperature: row.temperature,
       humidity: row.humidity,
       pressure: row.pressure,
