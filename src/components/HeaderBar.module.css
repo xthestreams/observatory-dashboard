@@ -1,0 +1,193 @@
+.headerBar {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(20, 20, 40, 0.8);
+  border-bottom: 1px solid rgba(96, 165, 250, 0.1);
+  backdrop-filter: blur(10px);
+  flex-wrap: wrap;
+}
+
+/* Identity (logo + name) */
+.identity {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.logo {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+.logoPlaceholder {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(30, 58, 95, 0.4);
+  border-radius: 6px;
+  font-size: 1.25rem;
+}
+
+.nameBlock {
+  display: flex;
+  flex-direction: column;
+}
+
+.siteName {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #60a5fa;
+  margin: 0;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+}
+
+.subtitle {
+  font-size: 0.65rem;
+  color: #888;
+  margin: 0;
+}
+
+/* Info groups */
+.infoGroup {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0 0.75rem;
+  border-left: 1px solid rgba(96, 165, 250, 0.1);
+}
+
+.groupIcon {
+  font-size: 0.9rem;
+  opacity: 0.7;
+  margin-top: 0.1rem;
+}
+
+.groupContent {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.primaryValue {
+  font-size: 0.75rem;
+  color: #e2e8f0;
+  font-weight: 500;
+}
+
+.secondaryValue {
+  font-size: 0.65rem;
+  color: #888;
+}
+
+/* MPC Codes */
+.mpcCodes {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.mpcCode {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #60a5fa;
+  background: rgba(96, 165, 250, 0.15);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+
+.mpcCode:hover {
+  background: rgba(96, 165, 250, 0.25);
+}
+
+/* Telemetry Status */
+.telemetryRow {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.statusDot {
+  font-size: 0.7rem;
+}
+
+.instrumentCount {
+  font-size: 0.65rem;
+  color: #888;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+}
+
+.failedList {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.failedItem {
+  font-size: 0.6rem;
+  font-weight: 500;
+}
+
+/* Update Time */
+.updateTime {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  margin-left: auto;
+  padding-left: 0.75rem;
+  border-left: 1px solid rgba(96, 165, 250, 0.1);
+}
+
+.updateLabel {
+  font-size: 0.55rem;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.updateValue {
+  font-size: 0.8rem;
+  color: #888;
+  font-family: monospace;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .headerBar {
+    gap: 1rem;
+  }
+
+  .infoGroup {
+    padding: 0 0.5rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .headerBar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .infoGroup {
+    border-left: none;
+    padding: 0;
+  }
+
+  .updateTime {
+    align-items: flex-start;
+    margin-left: 0;
+    border-left: none;
+    padding-left: 0;
+  }
+}

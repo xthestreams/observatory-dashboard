@@ -2,16 +2,11 @@
 
 import { WeatherData, WeatherHistory, MetricName } from "@/types/weather";
 import {
-  getCloudIcon,
-  getWindIcon,
-  getRainIcon,
-  getDayIcon,
   getConditionColor,
   getHumidityCondition,
   getTempCondition,
 } from "@/lib/weatherHelpers";
 import { Sparkline } from "./Sparkline";
-import { WindCompass } from "./WindCompass";
 import styles from "./SkyConditionsPanel.module.css";
 
 interface SkyConditionsPanelProps {
@@ -22,7 +17,8 @@ interface SkyConditionsPanelProps {
 }
 
 /**
- * Full-width Sky Conditions panel with all measurements and 24h sparklines
+ * Full-width Sky Conditions panel with measurements and 24h sparklines
+ * Note: Cloud, wind, rain, daylight conditions moved to AlertConditions component
  */
 export function SkyConditionsPanel({
   data,
@@ -41,7 +37,6 @@ export function SkyConditionsPanel({
   const humidityData = getSparklineData("humidity");
   const dewpointData = getSparklineData("dewpoint");
   const windData = getSparklineData("wind_speed");
-  const gustData = getSparklineData("wind_gust");
   const skyTempData = getSparklineData("sky_temp");
   const ambientTempData = getSparklineData("ambient_temp");
   const pressureData = getSparklineData("pressure");
@@ -60,83 +55,7 @@ export function SkyConditionsPanel({
 
   return (
     <div className={styles.container}>
-      {/* Row 1: Condition indicators */}
-      <div className={styles.conditionsRow}>
-        {/* Cloud */}
-        <div
-          className={styles.conditionCard}
-          onClick={() => handleClick("cloud_condition")}
-          role="button"
-          tabIndex={0}
-        >
-          <div className={styles.conditionIcon}>{getCloudIcon(data?.cloud_condition)}</div>
-          <div className={styles.conditionLabel}>Cloud</div>
-          <div className={styles.conditionStatus} style={{ color: getConditionColor(data?.cloud_condition, "cloud") }}>
-            {data?.cloud_condition ?? "Unknown"}
-          </div>
-          {data?.sky_temp !== null && data?.ambient_temp !== null && (
-            <div className={styles.conditionDetail}>
-              Sky-Amb: {((data?.sky_temp ?? 0) - (data?.ambient_temp ?? 0)).toFixed(1)}°C
-            </div>
-          )}
-        </div>
-
-        {/* Rain */}
-        <div
-          className={styles.conditionCard}
-          onClick={() => handleClick("rain_condition")}
-          role="button"
-          tabIndex={0}
-        >
-          <div className={styles.conditionIcon}>{getRainIcon(data?.rain_condition)}</div>
-          <div className={styles.conditionLabel}>Rain</div>
-          <div className={styles.conditionStatus} style={{ color: getConditionColor(data?.rain_condition, "rain") }}>
-            {data?.rain_condition ?? "Unknown"}
-          </div>
-          {data?.rain_rate !== null && data?.rain_rate !== undefined && data.rain_rate > 0 && (
-            <div className={styles.conditionDetail}>{data.rain_rate.toFixed(1)} mm/hr</div>
-          )}
-        </div>
-
-        {/* Wind Condition */}
-        <div
-          className={styles.conditionCard}
-          onClick={() => handleClick("wind_condition")}
-          role="button"
-          tabIndex={0}
-        >
-          <div className={styles.conditionIcon}>{getWindIcon(data?.wind_condition)}</div>
-          <div className={styles.conditionLabel}>Wind</div>
-          <div className={styles.conditionStatus} style={{ color: getConditionColor(data?.wind_condition, "wind") }}>
-            {data?.wind_condition ?? "Unknown"}
-          </div>
-        </div>
-
-        {/* Daylight */}
-        <div
-          className={styles.conditionCard}
-          onClick={() => handleClick("day_condition")}
-          role="button"
-          tabIndex={0}
-        >
-          <div className={styles.conditionIcon}>{getDayIcon(data?.day_condition)}</div>
-          <div className={styles.conditionLabel}>Daylight</div>
-          <div className={styles.conditionStatus} style={{ color: getConditionColor(data?.day_condition, "day") }}>
-            {data?.day_condition ?? "Unknown"}
-          </div>
-        </div>
-
-        {/* Wind Compass */}
-        <div className={styles.compassContainer}>
-          <WindCompass
-            direction={data?.wind_direction ?? null}
-            speed={data?.wind_speed ?? null}
-            gust={data?.wind_gust ?? null}
-          />
-        </div>
-      </div>
-
-      {/* Row 2: Measurements with sparklines */}
+      {/* Measurements with sparklines */}
       <div className={styles.measurementsRow}>
         {/* Temperature */}
         <div

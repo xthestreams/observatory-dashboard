@@ -17,8 +17,9 @@ import {
   SQMGauge,
   SQMGraph,
   AstronomyPanel,
-  ObservatoryInfo,
   SkyConditionsPanel,
+  HeaderBar,
+  AlertConditions,
 } from "@/components";
 import InstrumentAlert from "@/components/InstrumentAlert";
 import InstrumentDetailModal from "@/components/InstrumentDetailModal";
@@ -129,42 +130,16 @@ export default function Dashboard() {
         onInstrumentClick={handleInstrumentAlertClick}
       />
 
+      {/* Row 0: Full-width Header Bar */}
+      <HeaderBar telemetryHealth={telemetryHealth} lastUpdate={lastUpdate} />
+
       <main className={styles.mainGrid}>
-        {/* Row 1: Observatory, Astronomy, Sky Quality, AllSky Camera */}
+        {/* Row 1: Alert Conditions, SQM, Radar, AllSky */}
 
-        {/* Observatory Info (with header content) */}
+        {/* Alert Conditions (Cloud, Wind, Rain, Daylight + Compass) */}
         <section className={styles.panel}>
-          <div className={styles.observatoryHeader}>
-            <div className={styles.logo}>
-              {siteConfig.logoUrl ? (
-                <img
-                  src={siteConfig.logoUrl}
-                  alt={`${siteConfig.siteName} logo`}
-                  className={styles.logoImage}
-                />
-              ) : (
-                <div className={styles.logoPlaceholder}>
-                  <span className={styles.logoIcon}>🔭</span>
-                </div>
-              )}
-              <div className={styles.logoText}>
-                <h1>{siteConfig.siteName}</h1>
-                <p>{siteConfig.siteSubtitle}</p>
-              </div>
-            </div>
-            {lastUpdate && (
-              <div className={styles.lastUpdate}>
-                {lastUpdate.toLocaleTimeString()}
-              </div>
-            )}
-          </div>
-          <ObservatoryInfo telemetryHealth={telemetryHealth} />
-        </section>
-
-        {/* Astronomy - Sun/Moon Data */}
-        <section className={styles.panel}>
-          <h2 className={styles.panelTitle}>Astronomy</h2>
-          <AstronomyPanel />
+          <h2 className={styles.panelTitle}>Conditions</h2>
+          <AlertConditions data={data} onMetricClick={handleMetricClick} />
         </section>
 
         {/* SQM Panel */}
@@ -202,25 +177,6 @@ export default function Dashboard() {
           </div>
         </section>
 
-        {/* AllSky Camera with VirtualSky overlay */}
-        <section className={styles.panel}>
-          <h2 className={styles.panelTitle}>All-Sky Camera</h2>
-          <AllSkyPanel imageUrl={allskyUrl} />
-        </section>
-
-        {/* Row 2: Sky Conditions - Full Width */}
-        <section className={`${styles.panel} ${styles.skyConditionsPanel}`}>
-          <h2 className={styles.panelTitle}>Sky Conditions</h2>
-          <SkyConditionsPanel
-            data={data}
-            weatherHistory={weatherHistory}
-            onMetricClick={handleMetricClick}
-            getInstrumentCount={getInstrumentCount}
-          />
-        </section>
-
-        {/* Row 3: BOM Radar, BOM Satellite Visible, BOM Satellite Infrared, Forecast */}
-
         {/* BOM Radar */}
         <section className={styles.panel}>
           <h2 className={styles.panelTitle}>Radar</h2>
@@ -231,6 +187,34 @@ export default function Dashboard() {
               className={styles.bomImage}
             />
           </div>
+        </section>
+
+        {/* AllSky Camera */}
+        <section className={styles.panel}>
+          <h2 className={styles.panelTitle}>All-Sky Camera</h2>
+          <AllSkyPanel imageUrl={allskyUrl} />
+        </section>
+
+        {/* Row 2: Sky Conditions (Measurements) - Full Width */}
+        <section className={`${styles.panel} ${styles.skyConditionsPanel}`}>
+          <h2 className={styles.panelTitle}>Measurements</h2>
+          <SkyConditionsPanel
+            data={data}
+            weatherHistory={weatherHistory}
+            onMetricClick={handleMetricClick}
+            getInstrumentCount={getInstrumentCount}
+          />
+        </section>
+
+        {/* Row 3: Forecasts - 5-day, Satellites, Astronomy */}
+
+        {/* 5-Day Forecast */}
+        <section className={styles.panel}>
+          <h2 className={styles.panelTitle}>5-Day Forecast</h2>
+          <ForecastPanel
+            latitude={siteConfig.latitude}
+            longitude={siteConfig.longitude}
+          />
         </section>
 
         {/* BOM Satellite Visible */}
@@ -257,18 +241,13 @@ export default function Dashboard() {
           </div>
         </section>
 
-        {/* Row 3: Forecast, Weather Station */}
-
-        {/* 5-Day Forecast */}
+        {/* Astronomy - Sun/Moon Data */}
         <section className={styles.panel}>
-          <h2 className={styles.panelTitle}>5-Day Forecast</h2>
-          <ForecastPanel
-            latitude={siteConfig.latitude}
-            longitude={siteConfig.longitude}
-          />
+          <h2 className={styles.panelTitle}>Astronomy</h2>
+          <AstronomyPanel />
         </section>
 
-        {/* Weather Station */}
+        {/* Row 4: Weather Station (Davis) */}
         <section className={`${styles.panel} ${styles.weatherPanel}`}>
           <h2 className={styles.panelTitle}>Weather Station</h2>
           {siteConfig.weatherLinkId ? (

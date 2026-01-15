@@ -29,64 +29,6 @@
   }
 }
 
-/* Observatory Header (inside panel) */
-.observatoryHeader {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 0.75rem;
-  padding-bottom: 0.75rem;
-  border-bottom: 1px solid rgba(96, 165, 250, 0.08);
-}
-
-.logo {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.logoIcon {
-  font-size: 1.75rem;
-}
-
-.logoImage {
-  width: 40px;
-  height: 40px;
-  object-fit: contain;
-  border-radius: 6px;
-}
-
-.logoPlaceholder {
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(30, 58, 95, 0.3);
-  border-radius: 6px;
-  border: 1px solid rgba(96, 165, 250, 0.1);
-}
-
-.logoText h1 {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #60a5fa;
-  margin: 0;
-  letter-spacing: 0.03em;
-}
-
-.logoText p {
-  font-size: 0.7rem;
-  color: #888;
-  margin: 0;
-}
-
-.lastUpdate {
-  font-size: 0.7rem;
-  color: #666;
-  margin-left: auto;
-}
-
 /* Main Grid - 4 column layout */
 .mainGrid {
   display: grid;
@@ -254,9 +196,9 @@
   display: block;
 }
 
-/* Weather - spans 3 columns on desktop */
+/* Weather - spans 4 columns on desktop */
 .weatherPanel {
-  grid-column: span 3;
+  grid-column: span 4;
 }
 
 @media (max-width: 1200px) {
@@ -281,8 +223,14 @@
 
 .weatherGrid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 0.5rem;
+}
+
+@media (max-width: 900px) {
+  .weatherGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 
 @media (max-width: 600px) {
