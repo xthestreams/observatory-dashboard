@@ -16,7 +16,7 @@ export const siteConfig = {
   // Observatory logo URL (optional)
   // Can be a path to an image in /public (e.g., "/logo.png")
   // or an external URL. Set to null to show default telescope icon.
-  logoUrl: https://www.srof.com.au/ as string | null,
+  logoUrl: "https://www.srof.com.au/logo.png" as string | null,
 
   // Minor Planet Center (MPC) observatory code(s)
   // Find your code at: https://minorplanetcenter.net/iau/lists/ObsCodesF.html
