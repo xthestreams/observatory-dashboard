@@ -8,11 +8,24 @@ interface InstrumentHealth {
   failure_rate: number;
 }
 
+interface PowerStatusPayload {
+  status: "good" | "degraded" | "down" | "unknown";
+  battery_charge: number | null;
+  battery_runtime: number | null;
+  input_voltage: number | null;
+  output_voltage: number | null;
+  ups_status: string | null;
+  ups_load: number | null;
+  ups_model: string | null;
+  last_update: string | null;
+}
+
 interface HeartbeatPayload {
   instruments: string[];  // List of instrument codes the collector is monitoring
   instrument_health: Record<string, InstrumentHealth>;  // Health status per instrument
   collector_version?: string;
   uptime_seconds?: number;
+  power_status?: PowerStatusPayload | null;  // UPS power status if available
 }
 
 /**
@@ -54,6 +67,7 @@ export async function POST(request: NextRequest) {
       instrument_health: data.instrument_health || {},
       collector_version: data.collector_version,
       uptime_seconds: data.uptime_seconds,
+      power_status: data.power_status || null,
     });
 
     return NextResponse.json({
@@ -93,5 +107,6 @@ export async function GET(request: NextRequest) {
     collectorVersion: health.collectorHeartbeat?.collectorVersion,
     uptimeSeconds: health.collectorHeartbeat?.uptimeSeconds,
     ageMs: health.collectorHeartbeat?.ageMs,
+    powerStatus: health.collectorHeartbeat?.powerStatus || null,
   });
 }

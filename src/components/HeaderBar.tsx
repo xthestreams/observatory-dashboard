@@ -1,7 +1,7 @@
 "use client";
 
 import { siteConfig, getDisplayLocation } from "@/lib/config";
-import { TelemetryHealth } from "@/types/weather";
+import { TelemetryHealth, PowerStatus } from "@/types/weather";
 import { formatRelativeTime } from "@/lib/instruments";
 import styles from "./HeaderBar.module.css";
 
@@ -45,6 +45,72 @@ export function HeaderBar({ telemetryHealth, lastUpdate }: HeaderBarProps) {
   const getInstrumentSummary = () => {
     if (!telemetryHealth || telemetryHealth.expectedCount === 0) return null;
     return `${telemetryHealth.activeCount}/${telemetryHealth.expectedCount}`;
+  };
+
+  // Power status helpers
+  const powerStatus = telemetryHealth?.collectorHeartbeat?.powerStatus;
+
+  const getPowerStatusIcon = () => {
+    if (!powerStatus || powerStatus.status === "unknown") return "○";
+    switch (powerStatus.status) {
+      case "good":
+        return "●";
+      case "degraded":
+        return "◐";
+      case "down":
+        return "○";
+      default:
+        return "?";
+    }
+  };
+
+  const getPowerStatusColor = () => {
+    if (!powerStatus || powerStatus.status === "unknown") return "#6b7280";
+    switch (powerStatus.status) {
+      case "good":
+        return "#22c55e";  // Green
+      case "degraded":
+        return "#f59e0b";  // Amber
+      case "down":
+        return "#ef4444";  // Red
+      default:
+        return "#6b7280";
+    }
+  };
+
+  const getPowerStatusLabel = () => {
+    if (!powerStatus || powerStatus.status === "unknown") return "Unknown";
+    switch (powerStatus.status) {
+      case "good":
+        return "Good";
+      case "degraded":
+        return "Degraded";
+      case "down":
+        return "Down";
+      default:
+        return "Unknown";
+    }
+  };
+
+  const getPowerDetail = () => {
+    if (!powerStatus) return null;
+
+    // Show battery percentage if on battery
+    if (powerStatus.ups_status && (powerStatus.ups_status.includes("OB") || powerStatus.ups_status.includes("LB"))) {
+      if (powerStatus.battery_charge !== null) {
+        const runtime = powerStatus.battery_runtime
+          ? ` (${Math.floor(powerStatus.battery_runtime / 60)}m)`
+          : "";
+        return `${powerStatus.battery_charge}%${runtime}`;
+      }
+    }
+
+    // Show input voltage when on mains
+    if (powerStatus.input_voltage !== null) {
+      return `${Math.round(powerStatus.input_voltage)}V`;
+    }
+
+    return null;
   };
 
   return (
@@ -99,6 +165,41 @@ export function HeaderBar({ telemetryHealth, lastUpdate }: HeaderBarProps) {
           </div>
         </div>
       )}
+
+      {/* Power Status */}
+      <div className={styles.infoGroup}>
+        <span className={styles.groupIcon}>⚡</span>
+        <div className={styles.groupContent}>
+          <div className={styles.telemetryRow}>
+            <span
+              className={styles.statusDot}
+              style={{ color: getPowerStatusColor() }}
+            >
+              {getPowerStatusIcon()}
+            </span>
+            <span className={styles.primaryValue}>
+              Power: {getPowerStatusLabel()}
+            </span>
+            {getPowerDetail() && (
+              <span className={styles.instrumentCount}>{getPowerDetail()}</span>
+            )}
+          </div>
+          {powerStatus?.status === "degraded" && (
+            <div className={styles.secondaryValue}>
+              On battery
+            </div>
+          )}
+          {powerStatus?.status === "down" && (
+            <div className={styles.failedList}>
+              <span className={styles.failedItem} style={{ color: "#ef4444" }}>
+                {powerStatus?.battery_charge !== null
+                  ? `Low battery: ${powerStatus.battery_charge}%`
+                  : "UPS offline"}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Telemetry Status */}
       <div className={styles.infoGroup}>

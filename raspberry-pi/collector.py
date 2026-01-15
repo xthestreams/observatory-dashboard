@@ -85,6 +85,10 @@ CONFIG = {
     # Legacy single-device codes for MQTT sources
     "instrument_code_mqtt_weather": os.getenv("INSTRUMENT_CODE_MQTT_WEATHER", "wx-mqtt"),
     "instrument_code_allsky": os.getenv("INSTRUMENT_CODE_ALLSKY", "allsky-main"),
+    # NUT UPS configuration
+    "nut_host": os.getenv("NUT_HOST", "localhost"),
+    "nut_port": int(os.getenv("NUT_PORT", "3493")),
+    "nut_ups_name": os.getenv("NUT_UPS_NAME", ""),  # e.g., "ups" - leave empty to disable
 }
 
 # Logging setup
@@ -843,6 +847,299 @@ def read_cloudwatcher_device(device_config: dict):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# NUT UPS READER
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class NUTClient:
+    """
+    Simple NUT (Network UPS Tools) client for querying UPS status.
+
+    Connects to upsd daemon and retrieves UPS variables.
+    """
+
+    def __init__(self, host: str = "localhost", port: int = 3493):
+        self.host = host
+        self.port = port
+        self._socket = None
+
+    def connect(self) -> bool:
+        """Connect to the NUT server."""
+        try:
+            self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self._socket.settimeout(10)
+            self._socket.connect((self.host, self.port))
+            logger.debug(f"NUT: Connected to {self.host}:{self.port}")
+            return True
+        except Exception as e:
+            logger.warning(f"NUT connect error: {e}")
+            self._socket = None
+            return False
+
+    def disconnect(self):
+        """Disconnect from the NUT server."""
+        if self._socket:
+            try:
+                self._socket.sendall(b"LOGOUT\n")
+                self._socket.close()
+            except Exception:
+                pass
+            self._socket = None
+
+    def _send_command(self, cmd: str) -> list:
+        """Send a command and return response lines."""
+        if not self._socket:
+            logger.debug("NUT: No socket connection")
+            return []
+
+        try:
+            self._socket.sendall(f"{cmd}\n".encode())
+
+            response = b""
+            chunk_count = 0
+            while True:
+                chunk = self._socket.recv(4096)
+                chunk_count += 1
+                if not chunk:
+                    logger.debug(f"NUT: Empty chunk received after {chunk_count} chunks")
+                    break
+                response += chunk
+                # Check for end markers - NUT uses "END LIST ..." or "OK" or "ERR ..."
+                decoded = response.decode("utf-8", errors="ignore")
+                if "\nEND " in decoded or "\nOK\n" in decoded or decoded.endswith("OK\n"):
+                    logger.debug(f"NUT: Found end marker after {chunk_count} chunks, {len(response)} bytes")
+                    break
+                if "ERR " in decoded:
+                    logger.debug(f"NUT: Found ERR in response: {decoded[:100]}")
+                    break
+
+            lines = response.decode("utf-8", errors="ignore").strip().split("\n")
+            logger.debug(f"NUT: Returning {len(lines)} lines")
+            return lines
+        except Exception as e:
+            logger.warning(f"NUT command error: {e}")
+            return []
+
+    def list_ups(self) -> list:
+        """List available UPS devices."""
+        lines = self._send_command("LIST UPS")
+        ups_list = []
+        for line in lines:
+            if line.startswith("UPS "):
+                parts = line.split(" ", 2)
+                if len(parts) >= 2:
+                    ups_list.append(parts[1])
+        return ups_list
+
+    def get_var(self, ups_name: str, var_name: str) -> Optional[str]:
+        """Get a single variable from a UPS."""
+        lines = self._send_command(f"GET VAR {ups_name} {var_name}")
+        for line in lines:
+            if line.startswith("VAR "):
+                # Format: VAR upsname varname "value"
+                parts = line.split('"')
+                if len(parts) >= 2:
+                    return parts[1]
+        return None
+
+    def list_vars(self, ups_name: str) -> Dict[str, str]:
+        """List all variables for a UPS."""
+        lines = self._send_command(f"LIST VAR {ups_name}")
+        vars_dict = {}
+        for line in lines:
+            if line.startswith("VAR "):
+                # Format: VAR upsname varname "value"
+                parts = line.split('"')
+                if len(parts) >= 2:
+                    var_part = line.split(" ", 3)
+                    if len(var_part) >= 3:
+                        var_name = var_part[2]
+                        vars_dict[var_name] = parts[1]
+        return vars_dict
+
+
+class PowerStatusTracker:
+    """
+    Tracks UPS power status for the observatory.
+
+    Status levels:
+    - "good": On mains power (OL status)
+    - "degraded": On battery but > 25% charge remaining
+    - "down": On battery with <= 25% charge, or UPS offline
+    """
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._status = "unknown"
+        self._battery_charge: Optional[float] = None
+        self._battery_runtime: Optional[int] = None
+        self._input_voltage: Optional[float] = None
+        self._output_voltage: Optional[float] = None
+        self._ups_status: Optional[str] = None
+        self._ups_load: Optional[float] = None
+        self._last_update: Optional[datetime] = None
+        self._ups_model: Optional[str] = None
+
+    def update(
+        self,
+        ups_status: str,
+        battery_charge: Optional[float] = None,
+        battery_runtime: Optional[int] = None,
+        input_voltage: Optional[float] = None,
+        output_voltage: Optional[float] = None,
+        ups_load: Optional[float] = None,
+        ups_model: Optional[str] = None,
+    ):
+        """Update power status from UPS readings."""
+        with self._lock:
+            self._ups_status = ups_status
+            self._battery_charge = battery_charge
+            self._battery_runtime = battery_runtime
+            self._input_voltage = input_voltage
+            self._output_voltage = output_voltage
+            self._ups_load = ups_load
+            self._ups_model = ups_model
+            self._last_update = datetime.utcnow()
+
+            # Determine overall status
+            # UPS status codes: OL=Online, OB=On Battery, LB=Low Battery
+            if "OL" in ups_status:
+                self._status = "good"
+            elif "OB" in ups_status or "LB" in ups_status:
+                # On battery - check charge level
+                if battery_charge is not None and battery_charge <= 25:
+                    self._status = "down"
+                else:
+                    self._status = "degraded"
+            else:
+                self._status = "unknown"
+
+    def set_offline(self):
+        """Mark UPS as offline/unreachable."""
+        with self._lock:
+            self._status = "down"
+            self._last_update = datetime.utcnow()
+
+    def get_status(self) -> Dict[str, Any]:
+        """Get current power status for heartbeat."""
+        with self._lock:
+            return {
+                "status": self._status,
+                "battery_charge": self._battery_charge,
+                "battery_runtime": self._battery_runtime,
+                "input_voltage": self._input_voltage,
+                "output_voltage": self._output_voltage,
+                "ups_status": self._ups_status,
+                "ups_load": self._ups_load,
+                "ups_model": self._ups_model,
+                "last_update": self._last_update.isoformat() if self._last_update else None,
+            }
+
+
+# Global power status tracker
+power_tracker = PowerStatusTracker()
+
+
+def read_nut_ups():
+    """
+    Read UPS status from NUT daemon.
+    Runs in a loop, polling every 30 seconds.
+    """
+    host = CONFIG["nut_host"]
+    port = CONFIG["nut_port"]
+    ups_name = CONFIG["nut_ups_name"]
+
+    if not ups_name:
+        logger.info("NUT UPS monitoring disabled (no UPS name configured)")
+        return
+
+    logger.info(f"Starting NUT UPS reader: {ups_name}@{host}:{port}")
+    poll_interval = 30  # Poll every 30 seconds
+
+    while True:
+        try:
+            client = NUTClient(host, port)
+
+            if not client.connect():
+                logger.warning(f"NUT: Failed to connect to {host}:{port}")
+                power_tracker.set_offline()
+                time.sleep(poll_interval)
+                continue
+
+            try:
+                # Get all UPS variables
+                vars_dict = client.list_vars(ups_name)
+
+                if not vars_dict:
+                    logger.warning(f"NUT: No variables returned for {ups_name}")
+                    power_tracker.set_offline()
+                else:
+                    # Extract key values
+                    ups_status = vars_dict.get("ups.status", "")
+                    battery_charge = None
+                    battery_runtime = None
+                    input_voltage = None
+                    output_voltage = None
+                    ups_load = None
+                    ups_model = vars_dict.get("ups.model")
+
+                    if "battery.charge" in vars_dict:
+                        try:
+                            battery_charge = float(vars_dict["battery.charge"])
+                        except ValueError:
+                            pass
+
+                    if "battery.runtime" in vars_dict:
+                        try:
+                            battery_runtime = int(vars_dict["battery.runtime"])
+                        except ValueError:
+                            pass
+
+                    if "input.voltage" in vars_dict:
+                        try:
+                            input_voltage = float(vars_dict["input.voltage"])
+                        except ValueError:
+                            pass
+
+                    if "output.voltage" in vars_dict:
+                        try:
+                            output_voltage = float(vars_dict["output.voltage"])
+                        except ValueError:
+                            pass
+
+                    if "ups.load" in vars_dict:
+                        try:
+                            ups_load = float(vars_dict["ups.load"])
+                        except ValueError:
+                            pass
+
+                    # Update power tracker
+                    power_tracker.update(
+                        ups_status=ups_status,
+                        battery_charge=battery_charge,
+                        battery_runtime=battery_runtime,
+                        input_voltage=input_voltage,
+                        output_voltage=output_voltage,
+                        ups_load=ups_load,
+                        ups_model=ups_model,
+                    )
+
+                    logger.info(
+                        f"NUT [{ups_name}]: status={ups_status}, "
+                        f"charge={battery_charge}%, runtime={battery_runtime}s, "
+                        f"input={input_voltage}V, load={ups_load}%"
+                    )
+
+            finally:
+                client.disconnect()
+
+        except Exception as e:
+            logger.error(f"NUT error: {e}")
+            power_tracker.set_offline()
+
+        time.sleep(poll_interval)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # BOM SATELLITE IMAGE FETCHER
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1285,11 +1582,18 @@ def push_heartbeat():
 
             uptime_seconds = int(time.time() - COLLECTOR_START_TIME)
 
+            # Get power status if UPS monitoring is enabled
+            power_status = None
+            if CONFIG["nut_ups_name"]:
+                power_status = power_tracker.get_status()
+                logger.info(f"Heartbeat power_status: {power_status}")
+
             payload = {
                 "instruments": active_instruments,
                 "instrument_health": instrument_health,
                 "collector_version": COLLECTOR_VERSION,
                 "uptime_seconds": uptime_seconds,
+                "power_status": power_status,
             }
 
             response = requests.post(
@@ -1380,11 +1684,15 @@ def main():
         )
         threads.append(t)
 
-    # Add data pusher, config pusher, heartbeat, and BOM imagery threads
+    # Add data pusher, config pusher, heartbeat, BOM imagery, and NUT UPS threads
     threads.append(threading.Thread(target=push_data, daemon=True, name="pusher"))
     threads.append(threading.Thread(target=push_config, daemon=True, name="config-pusher"))
     threads.append(threading.Thread(target=push_heartbeat, daemon=True, name="heartbeat"))
     threads.append(threading.Thread(target=push_bom_imagery, daemon=True, name="bom-imagery"))
+
+    # Add NUT UPS reader if configured
+    if CONFIG["nut_ups_name"]:
+        threads.append(threading.Thread(target=read_nut_ups, daemon=True, name="nut-ups"))
 
     for t in threads:
         logger.info(f"Starting thread: {t.name}")

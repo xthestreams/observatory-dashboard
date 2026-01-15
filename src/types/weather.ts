@@ -120,6 +120,26 @@ export interface FailedInstrument {
 }
 
 /**
+ * Power status from UPS monitoring
+ * Status levels:
+ * - "good": On mains power (UPS status OL)
+ * - "degraded": On battery but > 25% charge remaining
+ * - "down": On battery with <= 25% charge, UPS offline, or no heartbeat
+ * - "unknown": No UPS configured or status not yet received
+ */
+export interface PowerStatus {
+  status: "good" | "degraded" | "down" | "unknown";
+  battery_charge: number | null;       // 0-100 percent
+  battery_runtime: number | null;      // Seconds remaining
+  input_voltage: number | null;        // Mains input voltage
+  output_voltage: number | null;       // UPS output voltage
+  ups_status: string | null;           // Raw UPS status (OL, OB, LB, etc.)
+  ups_load: number | null;             // Load percentage
+  ups_model: string | null;            // UPS model name
+  last_update: string | null;          // ISO timestamp
+}
+
+/**
  * Collector heartbeat info
  */
 export interface CollectorHeartbeat {
@@ -129,6 +149,7 @@ export interface CollectorHeartbeat {
   collectorVersion: string | null;
   uptimeSeconds: number | null;
   ageMs: number;  // How old is the heartbeat
+  powerStatus?: PowerStatus | null;  // UPS power status if available
 }
 
 /**

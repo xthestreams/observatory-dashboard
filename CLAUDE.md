@@ -41,6 +41,33 @@ The **collector is the source of truth** for instrument health. It tracks succes
    - Overrides instrument status with collector-reported health
    - Derives `failedInstruments` from telemetryHealth, not Supabase
 
+### UPS Power Monitoring
+
+The collector can monitor UPS status via NUT (Network UPS Tools):
+
+1. **Collector** (`raspberry-pi/collector.py`):
+   - `NUTClient` class connects to local upsd daemon
+   - `PowerStatusTracker` tracks UPS state and derives overall status
+   - Polls UPS every 30 seconds
+   - Sends power status in heartbeat payload
+
+2. **Power Status Levels**:
+   - `good`: On mains power (UPS status OL)
+   - `degraded`: On battery with > 25% charge remaining
+   - `down`: On battery with ≤ 25% charge, or UPS/collector offline
+
+3. **Dashboard** (`src/components/HeaderBar.tsx`):
+   - Shows power status widget with icon (⚡)
+   - Color-coded: green (good), amber (degraded), red (down)
+   - Shows input voltage (on mains) or battery % (on battery)
+
+4. **Configuration** (in Pi's `.env`):
+   ```
+   NUT_HOST=localhost
+   NUT_PORT=3493
+   NUT_UPS_NAME=ups    # Leave empty to disable UPS monitoring
+   ```
+
 ### Key Endpoints
 
 | Endpoint | Method | Auth | Description |
@@ -133,12 +160,12 @@ npm run lint     # Run ESLint
 
 ### Check Heartbeat Status
 ```bash
-curl -s "https://observatory-dashboard.vercel.app/api/heartbeat?debug=true" | python3 -m json.tool
+curl -s "https://telemetry.srof.com.au/api/heartbeat?debug=true" | python3 -m json.tool
 ```
 
 ### Check Instrument Health
 ```bash
-curl -s "https://observatory-dashboard.vercel.app/api/current" | python3 -c "
+curl -s "https://telemetry.srof.com.au/api/current" | python3 -c "
 import sys, json
 d = json.load(sys.stdin)
 th = d.get('telemetryHealth', {})

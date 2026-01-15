@@ -13,7 +13,7 @@
  */
 
 import { Redis } from "@upstash/redis";
-import { TelemetryHealth, CollectorHeartbeat, FailedInstrument } from "@/types/weather";
+import { TelemetryHealth, CollectorHeartbeat, FailedInstrument, PowerStatus } from "@/types/weather";
 
 // Lazy-initialized Upstash Redis client
 let _redis: Redis | null = null;
@@ -53,6 +53,21 @@ interface InstrumentHealthStatus {
 }
 
 /**
+ * Power status from UPS
+ */
+interface PowerStatusState {
+  status: "good" | "degraded" | "down" | "unknown";
+  battery_charge: number | null;
+  battery_runtime: number | null;
+  input_voltage: number | null;
+  output_voltage: number | null;
+  ups_status: string | null;
+  ups_load: number | null;
+  ups_model: string | null;
+  last_update: string | null;
+}
+
+/**
  * Heartbeat state stored in KV
  */
 interface HeartbeatState {
@@ -61,6 +76,7 @@ interface HeartbeatState {
   instrument_health: Record<string, InstrumentHealthStatus>;
   collectorVersion: string | null;
   uptimeSeconds: number | null;
+  powerStatus: PowerStatusState | null;
 }
 
 /**
@@ -116,6 +132,7 @@ export async function updateHeartbeat(data: {
   instrument_health?: Record<string, InstrumentHealthStatus>;
   collector_version?: string;
   uptime_seconds?: number;
+  power_status?: PowerStatusState | null;
 }): Promise<void> {
   const heartbeat: HeartbeatState = {
     timestamp: Date.now(),
@@ -123,6 +140,7 @@ export async function updateHeartbeat(data: {
     instrument_health: data.instrument_health || {},
     collectorVersion: data.collector_version || null,
     uptimeSeconds: data.uptime_seconds || null,
+    powerStatus: data.power_status || null,
   };
 
   // Always update local pending state
@@ -224,6 +242,16 @@ function buildHealthFromHeartbeat(heartbeat: HeartbeatState): TelemetryHealth {
   const ageMs = now - heartbeat.timestamp;
   const heartbeatIsStale = ageMs > HEARTBEAT_STALE_MS;
 
+  // Build power status - if heartbeat is stale, mark power as "down"
+  let powerStatus: PowerStatus | null = null;
+  if (heartbeat.powerStatus) {
+    powerStatus = {
+      ...heartbeat.powerStatus,
+      // Override status to "down" if heartbeat is stale (no recent communication)
+      status: heartbeatIsStale ? "down" : heartbeat.powerStatus.status,
+    };
+  }
+
   // Build collector heartbeat status
   const collectorHeartbeat: CollectorHeartbeat = {
     status: heartbeatIsStale ? "stale" : "ok",
@@ -232,6 +260,7 @@ function buildHealthFromHeartbeat(heartbeat: HeartbeatState): TelemetryHealth {
     collectorVersion: heartbeat.collectorVersion,
     uptimeSeconds: heartbeat.uptimeSeconds,
     ageMs,
+    powerStatus,
   };
 
   // Count instruments by health status (from collector-reported data)
