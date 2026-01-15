@@ -464,59 +464,44 @@ def get_sqm_serial(sock) -> Optional[str]:
     return None
 
 
-def read_sqm_with_retry(sock: socket.socket, max_retries: int = 3, retry_delay: float = 2.0) -> Optional[tuple]:
+def read_sqm_single(sock: socket.socket, timeout: float = 10.0) -> Optional[tuple]:
     """
-    Attempt to read from SQM with retries.
-    Returns (sqm_value, sqm_temp) on success, None on failure after all retries.
+    Perform a single SQM reading.
+    Returns (sqm_value, sqm_temp) on success, None on invalid response.
+    Raises socket errors on connection issues.
     """
-    for attempt in range(max_retries):
-        try:
-            sock.sendall(b"rx")
-            time.sleep(0.5)
+    sock.sendall(b"rx")
+    time.sleep(0.5)
 
-            response = b""
-            while not response.endswith(b"\n"):
-                chunk = sock.recv(256)
-                if not chunk:
-                    raise ConnectionError("Connection closed")
-                response += chunk
+    response = b""
+    while not response.endswith(b"\n"):
+        chunk = sock.recv(256)
+        if not chunk:
+            raise ConnectionError("Connection closed")
+        response += chunk
 
-            response_str = response.decode("ascii", errors="ignore").strip()
+    response_str = response.decode("ascii", errors="ignore").strip()
 
-            if response_str.startswith("r,"):
-                parts = response_str.split(",")
-                if len(parts) >= 2:
-                    mag_str = parts[1].strip()
-                    sqm_value = float(mag_str.replace("m", "").strip())
+    if response_str.startswith("r,"):
+        parts = response_str.split(",")
+        if len(parts) >= 2:
+            mag_str = parts[1].strip()
+            sqm_value = float(mag_str.replace("m", "").strip())
 
-                    sqm_temp = None
-                    if len(parts) >= 5:
-                        temp_str = parts[4].strip()
-                        if temp_str.endswith("C"):
-                            sqm_temp = float(temp_str.replace("C", "").strip())
+            sqm_temp = None
+            if len(parts) >= 5:
+                temp_str = parts[4].strip()
+                if temp_str.endswith("C"):
+                    sqm_temp = float(temp_str.replace("C", "").strip())
 
-                    return (sqm_value, sqm_temp)
+            return (sqm_value, sqm_temp)
 
-            # Invalid response format - retry
-            if attempt < max_retries - 1:
-                logger.debug(f"SQM retry {attempt + 1}/{max_retries}: invalid response: {response_str[:50]}")
-                time.sleep(retry_delay)
-            else:
-                logger.warning(f"SQM failed after {max_retries} attempts: invalid response: {response_str[:50]}")
-
-        except (socket.timeout, socket.error) as e:
-            if attempt < max_retries - 1:
-                logger.debug(f"SQM retry {attempt + 1}/{max_retries}: {e}")
-                time.sleep(retry_delay)
-            else:
-                logger.warning(f"SQM failed after {max_retries} attempts: {e}")
-                raise
-
+    logger.debug(f"SQM invalid response: {response_str[:50]}")
     return None
 
 
 def read_sqm_device(device_config: dict):
-    """Read from a single SQM-LE device."""
+    """Read from a single SQM-LE device with reconnection on errors."""
     host = device_config["host"]
     port = device_config["port"]
     slot = device_config["slot"]
@@ -524,29 +509,35 @@ def read_sqm_device(device_config: dict):
     # Initial instrument code based on IP (will be updated with serial if available)
     instrument_code = f"sqm-{host.replace('.', '-')}"
     serial_obtained = False
+    max_retries = 3
+    retry_delay = 5.0
 
     logger.info(f"Starting SQM-LE reader slot {slot} on {host}:{port}")
 
     while True:
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-                sock.settimeout(10)
-                sock.connect((host, port))
-                logger.info(f"Connected to SQM-LE at {host}:{port}")
+        success = False
 
-                # Try to get serial number on first successful connection
-                if not serial_obtained:
-                    serial = get_sqm_serial(sock)
-                    if serial:
-                        instrument_code = f"sqm-{serial}"
-                        serial_obtained = True
-                        logger.info(f"SQM at {host} identified as serial {serial}, code: {instrument_code}")
-                    else:
-                        logger.info(f"SQM at {host} using IP-based code: {instrument_code}")
+        for attempt in range(max_retries):
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                    sock.settimeout(10)
+                    sock.connect((host, port))
 
-                while True:
-                    # Attempt read with retries
-                    result = read_sqm_with_retry(sock, max_retries=3, retry_delay=2.0)
+                    if attempt == 0:
+                        logger.debug(f"Connected to SQM-LE at {host}:{port}")
+
+                    # Try to get serial number on first successful connection
+                    if not serial_obtained:
+                        serial = get_sqm_serial(sock)
+                        if serial:
+                            instrument_code = f"sqm-{serial}"
+                            serial_obtained = True
+                            logger.info(f"SQM at {host} identified as serial {serial}, code: {instrument_code}")
+                        else:
+                            logger.info(f"SQM at {host} using IP-based code: {instrument_code}")
+
+                    # Attempt single read
+                    result = read_sqm_single(sock)
 
                     if result:
                         sqm_value, sqm_temp = result
@@ -557,21 +548,33 @@ def read_sqm_device(device_config: dict):
                         )
                         health_tracker.record_success(instrument_code)
                         logger.debug(f"SQM [{instrument_code}]: {sqm_value} mag/arcsec², temp={sqm_temp}°C")
+                        success = True
+                        break  # Success - exit retry loop
                     else:
-                        # Only record failure after all retries exhausted
-                        health_tracker.record_failure(instrument_code)
-                        logger.warning(f"SQM [{instrument_code}]: failed to get valid reading after retries")
+                        # Invalid response - retry with new connection
+                        if attempt < max_retries - 1:
+                            logger.debug(f"SQM {host} retry {attempt + 1}/{max_retries}: invalid response")
+                            time.sleep(retry_delay)
 
-                    time.sleep(60)
+            except (socket.error, ConnectionError, OSError) as e:
+                if attempt < max_retries - 1:
+                    logger.debug(f"SQM {host} retry {attempt + 1}/{max_retries}: {e}")
+                    time.sleep(retry_delay)
+                else:
+                    logger.warning(f"SQM {host} failed after {max_retries} attempts: {e}")
 
-        except (socket.error, ConnectionError) as e:
-            logger.error(f"SQM {host} connection error: {e}")
+            except Exception as e:
+                logger.error(f"SQM {host} unexpected error: {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay)
+
+        # Only record failure if all retries failed
+        if not success:
             health_tracker.record_failure(instrument_code)
-            time.sleep(60)
-        except Exception as e:
-            logger.error(f"SQM {host} error: {e}")
-            health_tracker.record_failure(instrument_code)
-            time.sleep(60)
+            logger.warning(f"SQM [{instrument_code}]: failed to get valid reading after {max_retries} attempts")
+
+        # Wait before next reading cycle
+        time.sleep(60)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
