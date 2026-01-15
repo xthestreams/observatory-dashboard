@@ -206,11 +206,11 @@ export default function Dashboard() {
           />
         </section>
 
-        {/* Row 3: Forecasts - 5-day, Satellites, Astronomy */}
+        {/* Row 3: Forecast (spans 2 columns), Satellites, Astronomy */}
 
-        {/* 5-Day Forecast */}
-        <section className={styles.panel}>
-          <h2 className={styles.panelTitle}>5-Day Forecast</h2>
+        {/* Forecast - Hourly + 5-Day */}
+        <section className={`${styles.panel} ${styles.forecastPanel}`}>
+          <h2 className={styles.panelTitle}>Weather Forecast</h2>
           <ForecastPanel
             latitude={siteConfig.latitude}
             longitude={siteConfig.longitude}

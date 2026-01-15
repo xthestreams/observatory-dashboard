@@ -3,6 +3,20 @@
 import { useEffect, useState } from "react";
 import styles from "./ForecastPanel.module.css";
 
+interface HourlyForecast {
+  time: string;
+  hour: string;
+  temperature: number;
+  humidity: number;
+  dewPoint: number;
+  cloudCover: number;
+  precipProbability: number;
+  precipitation: number;
+  windSpeed: number;
+  windDirection: number;
+  weatherCode: number;
+}
+
 interface DayForecast {
   date: string;
   dayName: string;
@@ -10,6 +24,7 @@ interface DayForecast {
   tempMin: number;
   weatherCode: number;
   precipitation: number;
+  precipProbability: number;
 }
 
 interface ForecastPanelProps {
@@ -18,42 +33,40 @@ interface ForecastPanelProps {
 }
 
 // WMO Weather interpretation codes
-// https://open-meteo.com/en/docs#weathervariables
 const weatherCodeToIcon: Record<number, { icon: string; description: string }> = {
-  0: { icon: "sun", description: "Clear sky" },
-  1: { icon: "sun", description: "Mainly clear" },
+  0: { icon: "sun", description: "Clear" },
+  1: { icon: "sun", description: "Clear" },
   2: { icon: "cloud-sun", description: "Partly cloudy" },
   3: { icon: "cloud", description: "Overcast" },
   45: { icon: "fog", description: "Fog" },
-  48: { icon: "fog", description: "Depositing rime fog" },
-  51: { icon: "drizzle", description: "Light drizzle" },
-  53: { icon: "drizzle", description: "Moderate drizzle" },
-  55: { icon: "drizzle", description: "Dense drizzle" },
+  48: { icon: "fog", description: "Fog" },
+  51: { icon: "drizzle", description: "Drizzle" },
+  53: { icon: "drizzle", description: "Drizzle" },
+  55: { icon: "drizzle", description: "Drizzle" },
   56: { icon: "sleet", description: "Freezing drizzle" },
-  57: { icon: "sleet", description: "Dense freezing drizzle" },
-  61: { icon: "rain", description: "Slight rain" },
-  63: { icon: "rain", description: "Moderate rain" },
+  57: { icon: "sleet", description: "Freezing drizzle" },
+  61: { icon: "rain", description: "Rain" },
+  63: { icon: "rain", description: "Rain" },
   65: { icon: "rain-heavy", description: "Heavy rain" },
   66: { icon: "sleet", description: "Freezing rain" },
-  67: { icon: "sleet", description: "Heavy freezing rain" },
-  71: { icon: "snow", description: "Slight snow" },
-  73: { icon: "snow", description: "Moderate snow" },
+  67: { icon: "sleet", description: "Freezing rain" },
+  71: { icon: "snow", description: "Snow" },
+  73: { icon: "snow", description: "Snow" },
   75: { icon: "snow-heavy", description: "Heavy snow" },
-  77: { icon: "snow", description: "Snow grains" },
-  80: { icon: "showers", description: "Slight showers" },
-  81: { icon: "showers", description: "Moderate showers" },
-  82: { icon: "showers-heavy", description: "Violent showers" },
-  85: { icon: "snow", description: "Slight snow showers" },
-  86: { icon: "snow-heavy", description: "Heavy snow showers" },
+  77: { icon: "snow", description: "Snow" },
+  80: { icon: "showers", description: "Showers" },
+  81: { icon: "showers", description: "Showers" },
+  82: { icon: "showers-heavy", description: "Heavy showers" },
+  85: { icon: "snow", description: "Snow showers" },
+  86: { icon: "snow-heavy", description: "Heavy snow" },
   95: { icon: "thunderstorm", description: "Thunderstorm" },
-  96: { icon: "thunderstorm", description: "Thunderstorm with hail" },
-  99: { icon: "thunderstorm", description: "Thunderstorm with heavy hail" },
+  96: { icon: "thunderstorm", description: "Thunderstorm" },
+  99: { icon: "thunderstorm", description: "Thunderstorm" },
 };
 
-function getWeatherIcon(code: number): string {
+function getWeatherIconPath(code: number): string {
   const weather = weatherCodeToIcon[code] || { icon: "cloud", description: "Unknown" };
 
-  // SVG icons inline for simplicity
   const icons: Record<string, string> = {
     sun: "M12 2v2m0 16v2M4 12H2m20 0h-2m-2.93-6.07 1.41-1.41m-12.02 0 1.41 1.41m12.02 12.02-1.41-1.41m-12.02 0-1.41 1.41M12 6a6 6 0 1 0 0 12 6 6 0 0 0 0-12z",
     "cloud-sun": "M12 2v1m0 18v1m9-10h1M2 12H1m16.36-5.64.71-.71M5.64 17.64l-.71.71m12.02-.71.71.71M5.64 6.36l-.71-.71M17 12a5 5 0 0 0-9.18-2.71A4 4 0 1 0 6 16h11a3 3 0 1 0 0-6",
@@ -77,8 +90,23 @@ function getWeatherDescription(code: number): string {
   return weatherCodeToIcon[code]?.description || "Unknown";
 }
 
+function getCloudCoverColor(percent: number): string {
+  if (percent <= 20) return "#22c55e"; // Green - clear
+  if (percent <= 50) return "#84cc16"; // Lime - mostly clear
+  if (percent <= 70) return "#f59e0b"; // Amber - partly cloudy
+  if (percent <= 85) return "#f97316"; // Orange - mostly cloudy
+  return "#ef4444"; // Red - overcast
+}
+
+function getWindDirection(degrees: number): string {
+  const directions = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+  const index = Math.round(degrees / 45) % 8;
+  return directions[index];
+}
+
 export default function ForecastPanel({ latitude, longitude }: ForecastPanelProps) {
-  const [forecast, setForecast] = useState<DayForecast[]>([]);
+  const [hourlyForecast, setHourlyForecast] = useState<HourlyForecast[]>([]);
+  const [dailyForecast, setDailyForecast] = useState<DayForecast[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -86,26 +114,55 @@ export default function ForecastPanel({ latitude, longitude }: ForecastPanelProp
     async function fetchForecast() {
       try {
         setLoading(true);
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=temperature_2m_max,temperature_2m_min,weather_code,precipitation_sum&timezone=auto&forecast_days=5`;
+
+        // Fetch both hourly and daily data
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m,relative_humidity_2m,dew_point_2m,precipitation_probability,precipitation,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m&daily=temperature_2m_max,temperature_2m_min,weather_code,precipitation_sum,precipitation_probability_max&timezone=auto&forecast_days=6`;
 
         const response = await fetch(url);
         if (!response.ok) throw new Error("Failed to fetch forecast");
 
         const data = await response.json();
 
-        const days: DayForecast[] = data.daily.time.map((date: string, i: number) => {
+        // Process hourly data - get next 12 hours
+        const now = new Date();
+        const hourlyData: HourlyForecast[] = [];
+
+        for (let i = 0; i < data.hourly.time.length && hourlyData.length < 12; i++) {
+          const forecastTime = new Date(data.hourly.time[i]);
+          if (forecastTime >= now) {
+            hourlyData.push({
+              time: data.hourly.time[i],
+              hour: forecastTime.toLocaleTimeString("en-AU", { hour: "numeric", hour12: true }),
+              temperature: Math.round(data.hourly.temperature_2m[i]),
+              humidity: Math.round(data.hourly.relative_humidity_2m[i]),
+              dewPoint: Math.round(data.hourly.dew_point_2m[i]),
+              cloudCover: Math.round(data.hourly.cloud_cover[i]),
+              precipProbability: Math.round(data.hourly.precipitation_probability[i]),
+              precipitation: data.hourly.precipitation[i],
+              windSpeed: Math.round(data.hourly.wind_speed_10m[i]),
+              windDirection: data.hourly.wind_direction_10m[i],
+              weatherCode: data.hourly.weather_code[i],
+            });
+          }
+        }
+
+        // Process daily data - skip today, get next 5 days
+        const dailyData: DayForecast[] = data.daily.time.slice(1, 6).map((date: string, i: number) => {
+          const idx = i + 1; // Skip first day (today)
           const d = new Date(date);
           return {
             date,
             dayName: d.toLocaleDateString("en-AU", { weekday: "short" }),
-            tempMax: Math.round(data.daily.temperature_2m_max[i]),
-            tempMin: Math.round(data.daily.temperature_2m_min[i]),
-            weatherCode: data.daily.weather_code[i],
-            precipitation: data.daily.precipitation_sum[i],
+            tempMax: Math.round(data.daily.temperature_2m_max[idx]),
+            tempMin: Math.round(data.daily.temperature_2m_min[idx]),
+            weatherCode: data.daily.weather_code[idx],
+            precipitation: data.daily.precipitation_sum[idx],
+            precipProbability: data.daily.precipitation_probability_max[idx],
           };
         });
 
-        setForecast(days);
+        setHourlyForecast(hourlyData);
+        setDailyForecast(dailyData);
         setError(null);
       } catch (err) {
         setError("Could not load forecast");
@@ -116,7 +173,6 @@ export default function ForecastPanel({ latitude, longitude }: ForecastPanelProp
     }
 
     fetchForecast();
-    // Refresh every 30 minutes
     const interval = setInterval(fetchForecast, 30 * 60 * 1000);
     return () => clearInterval(interval);
   }, [latitude, longitude]);
@@ -139,31 +195,84 @@ export default function ForecastPanel({ latitude, longitude }: ForecastPanelProp
 
   return (
     <div className={styles.container}>
-      <div className={styles.days}>
-        {forecast.map((day) => (
-          <div key={day.date} className={styles.day}>
-            <div className={styles.dayName}>{day.dayName}</div>
-            <svg
-              className={styles.icon}
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d={getWeatherIcon(day.weatherCode)} />
-            </svg>
-            <div className={styles.temps}>
-              <span className={styles.tempMax}>{day.tempMax}°</span>
-              <span className={styles.tempMin}>{day.tempMin}°</span>
+      {/* Hourly Detail Section */}
+      <div className={styles.hourlySection}>
+        <div className={styles.sectionHeader}>Next 12 Hours</div>
+        <div className={styles.hourlyGrid}>
+          {hourlyForecast.map((hour, idx) => (
+            <div key={hour.time} className={`${styles.hourCard} ${idx === 0 ? styles.currentHour : ""}`}>
+              <div className={styles.hourTime}>{idx === 0 ? "Now" : hour.hour}</div>
+              <svg
+                className={styles.hourIcon}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d={getWeatherIconPath(hour.weatherCode)} />
+              </svg>
+              <div className={styles.hourTemp}>{hour.temperature}°</div>
+              <div className={styles.hourDetails}>
+                <div
+                  className={styles.cloudBar}
+                  title={`Cloud: ${hour.cloudCover}%`}
+                >
+                  <div
+                    className={styles.cloudFill}
+                    style={{
+                      width: `${hour.cloudCover}%`,
+                      backgroundColor: getCloudCoverColor(hour.cloudCover),
+                    }}
+                  />
+                  <span className={styles.cloudText}>{hour.cloudCover}%</span>
+                </div>
+                <div className={styles.hourMeta}>
+                  <span title="Humidity">{hour.humidity}%</span>
+                  <span title={`Wind ${getWindDirection(hour.windDirection)}`}>{hour.windSpeed}km/h</span>
+                </div>
+                {hour.precipProbability > 0 && (
+                  <div className={styles.hourPrecip} title="Precipitation probability">
+                    {hour.precipProbability}%
+                  </div>
+                )}
+              </div>
             </div>
-            {day.precipitation > 0 && (
-              <div className={styles.precip}>{day.precipitation.toFixed(1)}mm</div>
-            )}
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
+
+      {/* Daily Summary Section */}
+      <div className={styles.dailySection}>
+        <div className={styles.sectionHeader}>5-Day Outlook</div>
+        <div className={styles.dailyGrid}>
+          {dailyForecast.map((day) => (
+            <div key={day.date} className={styles.dayCard}>
+              <div className={styles.dayName}>{day.dayName}</div>
+              <svg
+                className={styles.dayIcon}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d={getWeatherIconPath(day.weatherCode)} />
+              </svg>
+              <div className={styles.dayTemps}>
+                <span className={styles.dayTempMax}>{day.tempMax}°</span>
+                <span className={styles.dayTempMin}>{day.tempMin}°</span>
+              </div>
+              {day.precipProbability > 20 && (
+                <div className={styles.dayPrecip}>{day.precipProbability}%</div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div className={styles.attribution}>
         <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">
           Open-Meteo
