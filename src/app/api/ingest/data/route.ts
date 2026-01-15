@@ -65,14 +65,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Update the instrument's last_reading_at timestamp
-    const { error: updateError } = await supabase
+    const { error: updateError, count } = await supabase
       .from("instruments")
       .update({ last_reading_at: timestamp, updated_at: timestamp })
       .eq("id", instrumentId);
 
     if (updateError) {
-      console.error("Error updating instrument last_reading_at:", updateError);
+      console.error(`Error updating instrument ${instrumentCode} (${instrumentId}) last_reading_at:`, updateError);
       // Don't fail the request - the reading was stored successfully
+    } else {
+      console.log(`Updated last_reading_at for ${instrumentCode} to ${timestamp}`);
     }
 
     // BACKWARD COMPATIBILITY: Also update legacy tables
