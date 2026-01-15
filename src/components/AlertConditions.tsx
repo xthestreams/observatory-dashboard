@@ -17,12 +17,53 @@ interface AlertConditionsProps {
 }
 
 /**
+ * Get dew point spread warning level and message
+ */
+function getDewPointWarning(temperature: number | null | undefined, dewpoint: number | null | undefined): {
+  level: "danger" | "warning" | "nominal" | "unknown";
+  message: string;
+  spread: number | null;
+} {
+  if (temperature == null || dewpoint == null) {
+    return { level: "unknown", message: "No data", spread: null };
+  }
+
+  const spread = temperature - dewpoint;
+
+  if (spread < 1) {
+    return { level: "danger", message: "Danger: high risk of dew", spread };
+  } else if (spread < 3) {
+    return { level: "warning", message: "Warning: dew likely", spread };
+  } else {
+    return { level: "nominal", message: "Nominal: dew unlikely", spread };
+  }
+}
+
+/**
+ * Get color for dew point warning level
+ */
+function getDewPointColor(level: "danger" | "warning" | "nominal" | "unknown"): string {
+  switch (level) {
+    case "danger":
+      return "#ef4444"; // Red
+    case "warning":
+      return "#f59e0b"; // Amber/Yellow
+    case "nominal":
+      return "#22c55e"; // Green
+    default:
+      return "#666";
+  }
+}
+
+/**
  * Compact alert conditions widget showing cloud, wind, rain, daylight status and wind compass
  */
 export function AlertConditions({ data, onMetricClick }: AlertConditionsProps) {
   const handleClick = (metric: MetricName) => {
     onMetricClick?.(metric);
   };
+
+  const dewWarning = getDewPointWarning(data?.temperature, data?.dewpoint);
 
   return (
     <div className={styles.container}>
@@ -102,6 +143,27 @@ export function AlertConditions({ data, onMetricClick }: AlertConditionsProps) {
               {data?.day_condition ?? "--"}
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Dew Point spread warning */}
+      <div className={styles.dewWarning}>
+        <div
+          className={styles.dewIndicator}
+          style={{ backgroundColor: getDewPointColor(dewWarning.level) }}
+        />
+        <div className={styles.dewContent}>
+          <span
+            className={styles.dewMessage}
+            style={{ color: getDewPointColor(dewWarning.level) }}
+          >
+            {dewWarning.message}
+          </span>
+          {dewWarning.spread !== null && (
+            <span className={styles.dewSpread}>
+              ({dewWarning.spread.toFixed(1)}°C)
+            </span>
+          )}
         </div>
       </div>
 

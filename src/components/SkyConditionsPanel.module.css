@@ -3,50 +3,52 @@
   flex-direction: column;
 }
 
-/* Measurements with sparklines */
+/* Measurements with sparklines - now 6 cards (removed Ambient) */
 .measurementsRow {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 0.5rem;
 }
 
 @media (max-width: 1400px) {
   .measurementsRow {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
 @media (max-width: 900px) {
   .measurementsRow {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
 @media (max-width: 600px) {
   .measurementsRow {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: 1fr;
   }
 }
 
+/* Horizontal card layout: info on left, graph on right */
 .measurementCard {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  padding: 0.5rem;
-  background: rgba(30, 58, 95, 0.15);
-  border-radius: 6px;
-  border: 1px solid rgba(96, 165, 250, 0.08);
+  padding: 0.4rem 0.5rem;
+  background: rgba(30, 58, 95, 0.1);
+  border-radius: 4px;
+  border: 1px solid rgba(96, 165, 250, 0.05);
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  gap: 0.5rem;
 }
 
 .measurementCard:hover {
-  background: rgba(30, 58, 95, 0.35);
-  border-color: rgba(96, 165, 250, 0.2);
+  background: rgba(30, 58, 95, 0.25);
+  border-color: rgba(96, 165, 250, 0.15);
 }
 
 .measurementCard:active {
-  transform: scale(0.98);
+  transform: scale(0.99);
 }
 
 .measurementCard:focus-visible {
@@ -54,55 +56,66 @@
   outline-offset: 2px;
 }
 
+/* Left side: info (icon, label, value, condition) */
+.measurementInfo {
+  display: flex;
+  flex-direction: column;
+  min-width: 70px;
+  flex-shrink: 0;
+}
+
 .measurementHeader {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
-  width: 100%;
-  justify-content: center;
+  gap: 0.2rem;
 }
 
 .measurementIcon {
-  font-size: 0.85rem;
+  font-size: 0.75rem;
 }
 
 .measurementLabel {
-  font-size: 0.6rem;
+  font-size: 0.55rem;
   color: #888;
   text-transform: uppercase;
   letter-spacing: 0.02em;
 }
 
 .badge {
-  font-size: 0.55rem;
+  font-size: 0.5rem;
   background: rgba(96, 165, 250, 0.2);
   color: #60a5fa;
-  padding: 0.1rem 0.3rem;
-  border-radius: 8px;
+  padding: 0.05rem 0.2rem;
+  border-radius: 6px;
   font-weight: 500;
+  margin-left: 0.15rem;
 }
 
 .measurementValue {
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 600;
   color: #e2e8f0;
-  margin-top: 0.25rem;
   line-height: 1.2;
-}
-
-.measurementSparkline {
-  margin-top: 0.25rem;
-  opacity: 0.9;
+  margin-top: 0.1rem;
 }
 
 .measurementCondition {
-  font-size: 0.65rem;
+  font-size: 0.55rem;
   font-weight: 500;
-  margin-top: 0.15rem;
+  margin-top: 0.1rem;
 }
 
 .measurementDetail {
-  font-size: 0.6rem;
+  font-size: 0.55rem;
   color: #888;
-  margin-top: 0.1rem;
+  margin-top: 0.05rem;
+}
+
+/* Right side: graph takes remaining space */
+.measurementGraph {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
 }

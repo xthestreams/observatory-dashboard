@@ -72,6 +72,39 @@
   margin-top: 0.1rem;
 }
 
+/* Dew point spread warning */
+.dewWarning {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  background: rgba(30, 58, 95, 0.15);
+  border-radius: 4px;
+}
+
+.dewIndicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dewContent {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+.dewMessage {
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.dewSpread {
+  font-size: 0.65rem;
+  color: #aaa;
+}
+
 /* Compass takes remaining space */
 .compassWrapper {
   flex: 1;

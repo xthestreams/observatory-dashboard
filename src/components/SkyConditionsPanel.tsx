@@ -38,7 +38,6 @@ export function SkyConditionsPanel({
   const dewpointData = getSparklineData("dewpoint");
   const windData = getSparklineData("wind_speed");
   const skyTempData = getSparklineData("sky_temp");
-  const ambientTempData = getSparklineData("ambient_temp");
   const pressureData = getSparklineData("pressure");
 
   const handleClick = (metric: MetricName) => {
@@ -55,7 +54,7 @@ export function SkyConditionsPanel({
 
   return (
     <div className={styles.container}>
-      {/* Measurements with sparklines */}
+      {/* Measurements with sparklines - horizontal layout */}
       <div className={styles.measurementsRow}>
         {/* Temperature */}
         <div
@@ -64,21 +63,23 @@ export function SkyConditionsPanel({
           role="button"
           tabIndex={0}
         >
-          <div className={styles.measurementHeader}>
-            <span className={styles.measurementIcon}>🌡️</span>
-            <span className={styles.measurementLabel}>Temperature</span>
-            {instrumentCount("temperature") > 1 && (
-              <span className={styles.badge}>{instrumentCount("temperature")}</span>
-            )}
+          <div className={styles.measurementInfo}>
+            <div className={styles.measurementHeader}>
+              <span className={styles.measurementIcon}>🌡️</span>
+              <span className={styles.measurementLabel}>Temperature</span>
+              {instrumentCount("temperature") > 1 && (
+                <span className={styles.badge}>{instrumentCount("temperature")}</span>
+              )}
+            </div>
+            <div className={styles.measurementValue}>
+              {formatValue(data?.temperature, 1, "°C")}
+            </div>
+            <div className={styles.measurementCondition} style={{ color: getConditionColor(getTempCondition(data?.temperature), "temp") }}>
+              {getTempCondition(data?.temperature)}
+            </div>
           </div>
-          <div className={styles.measurementValue}>
-            {formatValue(data?.temperature, 1, "°C")}
-          </div>
-          <div className={styles.measurementSparkline}>
-            <Sparkline data={tempData} width={100} height={28} color="#f59e0b" showMinMax />
-          </div>
-          <div className={styles.measurementCondition} style={{ color: getConditionColor(getTempCondition(data?.temperature), "temp") }}>
-            {getTempCondition(data?.temperature)}
+          <div className={styles.measurementGraph}>
+            <Sparkline data={tempData} width={180} height={50} color="#f59e0b" showMinMax showAxes />
           </div>
         </div>
 
@@ -89,21 +90,23 @@ export function SkyConditionsPanel({
           role="button"
           tabIndex={0}
         >
-          <div className={styles.measurementHeader}>
-            <span className={styles.measurementIcon}>💧</span>
-            <span className={styles.measurementLabel}>Humidity</span>
-            {instrumentCount("humidity") > 1 && (
-              <span className={styles.badge}>{instrumentCount("humidity")}</span>
-            )}
+          <div className={styles.measurementInfo}>
+            <div className={styles.measurementHeader}>
+              <span className={styles.measurementIcon}>💧</span>
+              <span className={styles.measurementLabel}>Humidity</span>
+              {instrumentCount("humidity") > 1 && (
+                <span className={styles.badge}>{instrumentCount("humidity")}</span>
+              )}
+            </div>
+            <div className={styles.measurementValue}>
+              {formatValue(data?.humidity, 0, "%")}
+            </div>
+            <div className={styles.measurementCondition} style={{ color: getConditionColor(getHumidityCondition(data?.humidity), "humidity") }}>
+              {getHumidityCondition(data?.humidity)}
+            </div>
           </div>
-          <div className={styles.measurementValue}>
-            {formatValue(data?.humidity, 0, "%")}
-          </div>
-          <div className={styles.measurementSparkline}>
-            <Sparkline data={humidityData} width={100} height={28} color="#3b82f6" showMinMax />
-          </div>
-          <div className={styles.measurementCondition} style={{ color: getConditionColor(getHumidityCondition(data?.humidity), "humidity") }}>
-            {getHumidityCondition(data?.humidity)}
+          <div className={styles.measurementGraph}>
+            <Sparkline data={humidityData} width={180} height={50} color="#3b82f6" showMinMax showAxes />
           </div>
         </div>
 
@@ -114,24 +117,26 @@ export function SkyConditionsPanel({
           role="button"
           tabIndex={0}
         >
-          <div className={styles.measurementHeader}>
-            <span className={styles.measurementIcon}>💦</span>
-            <span className={styles.measurementLabel}>Dewpoint</span>
-            {instrumentCount("dewpoint") > 1 && (
-              <span className={styles.badge}>{instrumentCount("dewpoint")}</span>
+          <div className={styles.measurementInfo}>
+            <div className={styles.measurementHeader}>
+              <span className={styles.measurementIcon}>💦</span>
+              <span className={styles.measurementLabel}>Dewpoint</span>
+              {instrumentCount("dewpoint") > 1 && (
+                <span className={styles.badge}>{instrumentCount("dewpoint")}</span>
+              )}
+            </div>
+            <div className={styles.measurementValue}>
+              {formatValue(data?.dewpoint, 1, "°C")}
+            </div>
+            {data?.temperature != null && data?.dewpoint != null && (
+              <div className={styles.measurementDetail}>
+                Spread: {(data.temperature - data.dewpoint).toFixed(1)}°C
+              </div>
             )}
           </div>
-          <div className={styles.measurementValue}>
-            {formatValue(data?.dewpoint, 1, "°C")}
+          <div className={styles.measurementGraph}>
+            <Sparkline data={dewpointData} width={180} height={50} color="#06b6d4" showMinMax showAxes />
           </div>
-          <div className={styles.measurementSparkline}>
-            <Sparkline data={dewpointData} width={100} height={28} color="#06b6d4" showMinMax />
-          </div>
-          {data?.temperature != null && data?.dewpoint != null && (
-            <div className={styles.measurementDetail}>
-              Spread: {(data.temperature - data.dewpoint).toFixed(1)}°C
-            </div>
-          )}
         </div>
 
         {/* Wind Speed */}
@@ -141,24 +146,26 @@ export function SkyConditionsPanel({
           role="button"
           tabIndex={0}
         >
-          <div className={styles.measurementHeader}>
-            <span className={styles.measurementIcon}>💨</span>
-            <span className={styles.measurementLabel}>Wind Speed</span>
-            {instrumentCount("wind_speed") > 1 && (
-              <span className={styles.badge}>{instrumentCount("wind_speed")}</span>
+          <div className={styles.measurementInfo}>
+            <div className={styles.measurementHeader}>
+              <span className={styles.measurementIcon}>💨</span>
+              <span className={styles.measurementLabel}>Wind Speed</span>
+              {instrumentCount("wind_speed") > 1 && (
+                <span className={styles.badge}>{instrumentCount("wind_speed")}</span>
+              )}
+            </div>
+            <div className={styles.measurementValue}>
+              {formatValue(data?.wind_speed, 1, " km/h")}
+            </div>
+            {data?.wind_gust != null && (
+              <div className={styles.measurementDetail}>
+                Gust: {data.wind_gust.toFixed(1)} km/h
+              </div>
             )}
           </div>
-          <div className={styles.measurementValue}>
-            {formatValue(data?.wind_speed, 1, " km/h")}
+          <div className={styles.measurementGraph}>
+            <Sparkline data={windData} width={180} height={50} color="#8b5cf6" showMinMax showAxes />
           </div>
-          <div className={styles.measurementSparkline}>
-            <Sparkline data={windData} width={100} height={28} color="#8b5cf6" showMinMax />
-          </div>
-          {data?.wind_gust != null && (
-            <div className={styles.measurementDetail}>
-              Gust: {data.wind_gust.toFixed(1)} km/h
-            </div>
-          )}
         </div>
 
         {/* Sky Temperature */}
@@ -168,40 +175,20 @@ export function SkyConditionsPanel({
           role="button"
           tabIndex={0}
         >
-          <div className={styles.measurementHeader}>
-            <span className={styles.measurementIcon}>🌌</span>
-            <span className={styles.measurementLabel}>Sky Temp</span>
-            {instrumentCount("sky_temp") > 1 && (
-              <span className={styles.badge}>{instrumentCount("sky_temp")}</span>
-            )}
+          <div className={styles.measurementInfo}>
+            <div className={styles.measurementHeader}>
+              <span className={styles.measurementIcon}>🌌</span>
+              <span className={styles.measurementLabel}>Sky Temp</span>
+              {instrumentCount("sky_temp") > 1 && (
+                <span className={styles.badge}>{instrumentCount("sky_temp")}</span>
+              )}
+            </div>
+            <div className={styles.measurementValue}>
+              {formatValue(data?.sky_temp, 1, "°C")}
+            </div>
           </div>
-          <div className={styles.measurementValue}>
-            {formatValue(data?.sky_temp, 1, "°C")}
-          </div>
-          <div className={styles.measurementSparkline}>
-            <Sparkline data={skyTempData} width={100} height={28} color="#a855f7" showMinMax />
-          </div>
-        </div>
-
-        {/* Ambient Temperature */}
-        <div
-          className={styles.measurementCard}
-          onClick={() => handleClick("ambient_temp")}
-          role="button"
-          tabIndex={0}
-        >
-          <div className={styles.measurementHeader}>
-            <span className={styles.measurementIcon}>🏠</span>
-            <span className={styles.measurementLabel}>Ambient</span>
-            {instrumentCount("ambient_temp") > 1 && (
-              <span className={styles.badge}>{instrumentCount("ambient_temp")}</span>
-            )}
-          </div>
-          <div className={styles.measurementValue}>
-            {formatValue(data?.ambient_temp, 1, "°C")}
-          </div>
-          <div className={styles.measurementSparkline}>
-            <Sparkline data={ambientTempData} width={100} height={28} color="#ec4899" showMinMax />
+          <div className={styles.measurementGraph}>
+            <Sparkline data={skyTempData} width={180} height={50} color="#a855f7" showMinMax showAxes />
           </div>
         </div>
 
@@ -212,18 +199,20 @@ export function SkyConditionsPanel({
           role="button"
           tabIndex={0}
         >
-          <div className={styles.measurementHeader}>
-            <span className={styles.measurementIcon}>📊</span>
-            <span className={styles.measurementLabel}>Pressure</span>
-            {instrumentCount("pressure") > 1 && (
-              <span className={styles.badge}>{instrumentCount("pressure")}</span>
-            )}
+          <div className={styles.measurementInfo}>
+            <div className={styles.measurementHeader}>
+              <span className={styles.measurementIcon}>📊</span>
+              <span className={styles.measurementLabel}>Pressure</span>
+              {instrumentCount("pressure") > 1 && (
+                <span className={styles.badge}>{instrumentCount("pressure")}</span>
+              )}
+            </div>
+            <div className={styles.measurementValue}>
+              {formatValue(data?.pressure, 1, " hPa")}
+            </div>
           </div>
-          <div className={styles.measurementValue}>
-            {formatValue(data?.pressure, 1, " hPa")}
-          </div>
-          <div className={styles.measurementSparkline}>
-            <Sparkline data={pressureData} width={100} height={28} color="#14b8a6" showMinMax />
+          <div className={styles.measurementGraph}>
+            <Sparkline data={pressureData} width={180} height={50} color="#14b8a6" showMinMax showAxes />
           </div>
         </div>
       </div>
