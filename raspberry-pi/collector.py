@@ -464,6 +464,57 @@ def get_sqm_serial(sock) -> Optional[str]:
     return None
 
 
+def read_sqm_with_retry(sock: socket.socket, max_retries: int = 3, retry_delay: float = 2.0) -> Optional[tuple]:
+    """
+    Attempt to read from SQM with retries.
+    Returns (sqm_value, sqm_temp) on success, None on failure after all retries.
+    """
+    for attempt in range(max_retries):
+        try:
+            sock.sendall(b"rx")
+            time.sleep(0.5)
+
+            response = b""
+            while not response.endswith(b"\n"):
+                chunk = sock.recv(256)
+                if not chunk:
+                    raise ConnectionError("Connection closed")
+                response += chunk
+
+            response_str = response.decode("ascii", errors="ignore").strip()
+
+            if response_str.startswith("r,"):
+                parts = response_str.split(",")
+                if len(parts) >= 2:
+                    mag_str = parts[1].strip()
+                    sqm_value = float(mag_str.replace("m", "").strip())
+
+                    sqm_temp = None
+                    if len(parts) >= 5:
+                        temp_str = parts[4].strip()
+                        if temp_str.endswith("C"):
+                            sqm_temp = float(temp_str.replace("C", "").strip())
+
+                    return (sqm_value, sqm_temp)
+
+            # Invalid response format - retry
+            if attempt < max_retries - 1:
+                logger.debug(f"SQM retry {attempt + 1}/{max_retries}: invalid response: {response_str[:50]}")
+                time.sleep(retry_delay)
+            else:
+                logger.warning(f"SQM failed after {max_retries} attempts: invalid response: {response_str[:50]}")
+
+        except (socket.timeout, socket.error) as e:
+            if attempt < max_retries - 1:
+                logger.debug(f"SQM retry {attempt + 1}/{max_retries}: {e}")
+                time.sleep(retry_delay)
+            else:
+                logger.warning(f"SQM failed after {max_retries} attempts: {e}")
+                raise
+
+    return None
+
+
 def read_sqm_device(device_config: dict):
     """Read from a single SQM-LE device."""
     host = device_config["host"]
@@ -494,41 +545,22 @@ def read_sqm_device(device_config: dict):
                         logger.info(f"SQM at {host} using IP-based code: {instrument_code}")
 
                 while True:
-                    sock.sendall(b"rx")
-                    time.sleep(0.5)
+                    # Attempt read with retries
+                    result = read_sqm_with_retry(sock, max_retries=3, retry_delay=2.0)
 
-                    response = b""
-                    while not response.endswith(b"\n"):
-                        chunk = sock.recv(256)
-                        if not chunk:
-                            raise ConnectionError("Connection closed")
-                        response += chunk
-
-                    response_str = response.decode("ascii", errors="ignore").strip()
-
-                    if response_str.startswith("r,"):
-                        parts = response_str.split(",")
-                        if len(parts) >= 2:
-                            mag_str = parts[1].strip()
-                            sqm_value = float(mag_str.replace("m", "").strip())
-
-                            sqm_temp = None
-                            if len(parts) >= 5:
-                                temp_str = parts[4].strip()
-                                if temp_str.endswith("C"):
-                                    sqm_temp = float(temp_str.replace("C", "").strip())
-
-                            data_store.update(
-                                instrument_code,
-                                sky_quality=sqm_value,
-                                sqm_temperature=sqm_temp,
-                            )
-                            health_tracker.record_success(instrument_code)
-                            logger.debug(f"SQM [{instrument_code}]: {sqm_value} mag/arcsec², temp={sqm_temp}°C")
+                    if result:
+                        sqm_value, sqm_temp = result
+                        data_store.update(
+                            instrument_code,
+                            sky_quality=sqm_value,
+                            sqm_temperature=sqm_temp,
+                        )
+                        health_tracker.record_success(instrument_code)
+                        logger.debug(f"SQM [{instrument_code}]: {sqm_value} mag/arcsec², temp={sqm_temp}°C")
                     else:
-                        # Invalid response format
+                        # Only record failure after all retries exhausted
                         health_tracker.record_failure(instrument_code)
-                        logger.warning(f"SQM [{instrument_code}]: invalid response: {response_str[:50]}")
+                        logger.warning(f"SQM [{instrument_code}]: failed to get valid reading after retries")
 
                     time.sleep(60)
 
