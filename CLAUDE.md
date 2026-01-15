@@ -7,69 +7,102 @@ This is an Observatory Dashboard built with Next.js 14 (App Router), Supabase, a
 ## Tech Stack
 
 - **Frontend**: Next.js 14, React 18, TypeScript, CSS Modules
-- **Backend**: Next.js API Routes, Supabase (PostgreSQL + Storage)
+- **Backend**: Next.js API Routes, Supabase (PostgreSQL + Storage), Upstash Redis (KV)
 - **Data Collection**: Python script on Raspberry Pi
 - **Deployment**: Vercel
+
+## Architecture
+
+### Data Flow
+
+```
+[Instruments] → [Raspberry Pi Collector] → [Vercel API] → [Supabase + Redis KV]
+                                                ↓
+                                         [Dashboard UI]
+```
+
+### Instrument Health Tracking
+
+The **collector is the source of truth** for instrument health. It tracks success/failure rates using a sliding window:
+
+1. **Collector** (`raspberry-pi/collector.py`):
+   - `InstrumentHealthTracker` class tracks last 10 readings per instrument
+   - Thresholds: HEALTHY (<20% failures), DEGRADED (20-80%), OFFLINE (>80%)
+   - Grace period: needs 3+ readings before reporting problems
+   - Sends health status via heartbeat every 60 seconds
+
+2. **Server** (`src/lib/telemetryKV.ts`):
+   - Stores collector-reported health in Upstash Redis
+   - Does NOT compute health from staleness - trusts the collector
+   - Rate-limited to 120s intervals for Upstash free tier
+
+3. **Dashboard** (`src/app/api/current/route.ts`):
+   - Gets `telemetryHealth` from KV first
+   - Overrides instrument status with collector-reported health
+   - Derives `failedInstruments` from telemetryHealth, not Supabase
+
+### Key Endpoints
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/api/current` | GET | None | Current conditions + instrument health |
+| `/api/heartbeat` | POST | Bearer | Receive heartbeat with health status |
+| `/api/heartbeat` | GET | None | Get current heartbeat status |
+| `/api/ingest/data` | POST | Bearer | Receive weather data from Pi |
+| `/api/ingest/image` | POST | Bearer | Receive AllSky image from Pi |
 
 ## Project Structure
 
 ```
 src/
-├── app/                    # Next.js App Router
-│   ├── api/               # API routes
-│   │   ├── current/       # GET /api/current - fetch current conditions
-│   │   ├── ingest/data/   # POST /api/ingest/data - receive data from Pi
-│   │   ├── ingest/image/  # POST /api/ingest/image - receive AllSky images
-│   │   └── allsky/        # GET /api/allsky/* - serve AllSky images
-│   ├── layout.tsx         # Root layout with font loading
-│   ├── page.tsx           # Main dashboard component
-│   ├── page.module.css    # Dashboard styles
-│   └── globals.css        # Global styles
-├── components/            # Reusable React components
-│   ├── ConditionIndicator.tsx
-│   ├── WeatherStat.tsx
-│   ├── SQMGauge.tsx
-│   └── SQMGraph.tsx
+├── app/
+│   ├── api/
+│   │   ├── current/          # Main data endpoint
+│   │   ├── heartbeat/        # Collector heartbeat with health
+│   │   ├── ingest/data/      # Data ingestion
+│   │   └── ...
+│   └── page.tsx              # Dashboard UI
+├── components/
+│   ├── ObservatoryInfo.tsx   # Telemetry health display
+│   ├── InstrumentAlert.tsx   # Failed instrument banner
+│   ├── WindCompass.tsx       # Wind direction compass
+│   └── ...
 ├── lib/
-│   ├── config.ts          # Site configuration (edit this!)
-│   ├── supabase.ts        # Supabase client helpers
-│   └── weatherHelpers.ts  # Icon/color helper functions
+│   ├── telemetryKV.ts        # Redis KV for health tracking
+│   ├── instruments.ts        # Instrument helpers
+│   └── ...
 └── types/
-    └── weather.ts         # TypeScript interfaces
+    └── weather.ts            # TypeScript interfaces
 
-raspberry-pi/              # Raspberry Pi collector (Python)
-supabase/
-└── schema.sql            # Database schema
+raspberry-pi/
+└── collector.py              # Pi data collector with health tracking
 ```
 
-## Key Files to Edit
+## Raspberry Pi Collector
 
-1. **`src/lib/config.ts`** - Site name, coordinates, WeatherLink ID
-2. **`.env.local`** - Supabase keys and API key
-3. **`raspberry-pi/.env`** - Pi configuration
-
-## Commands
-
+### SSH Access
 ```bash
-npm run dev      # Start development server on :3000
-npm run build    # Build for production
-npm run lint     # Run ESLint
-npm run type-check  # TypeScript type checking
+ssh observatory-pi
 ```
 
-## API Endpoints
+### Service Management
+```bash
+sudo systemctl restart observatory-collector
+sudo journalctl -u observatory-collector -f
+```
 
-| Endpoint | Method | Auth | Description |
-|----------|--------|------|-------------|
-| `/api/current` | GET | None | Get current conditions + SQM history |
-| `/api/ingest/data` | POST | Bearer token | Receive weather data from Pi |
-| `/api/ingest/image` | POST | Bearer token | Receive AllSky image from Pi |
-| `/api/allsky/latest.jpg` | GET | None | Serve latest AllSky image |
+### Deploy Updates
+```bash
+scp raspberry-pi/collector.py observatory-pi:~/observatory-collector/collector.py
+ssh observatory-pi "sudo systemctl restart observatory-collector"
+```
 
-## Database Tables
-
-- **`current_conditions`** - Single row with latest readings
-- **`weather_readings`** - Historical time-series data
+### Health Tracker Constants
+In `collector.py`:
+- `WINDOW_SIZE = 10` - Track last 10 readings
+- `MIN_READINGS = 3` - Grace period before reporting problems
+- `DEGRADED_THRESHOLD = 0.2` - 20% failures = degraded
+- `OFFLINE_THRESHOLD = 0.8` - 80% failures = offline
 
 ## Environment Variables
 
@@ -82,32 +115,51 @@ SUPABASE_URL
 SUPABASE_ANON_KEY
 SUPABASE_SERVICE_KEY
 INGEST_API_KEY
+
+# Upstash Redis (for telemetry health)
+KV_REST_API_URL
+KV_REST_API_TOKEN
 ```
 
-## Common Tasks
+## Commands
 
-### Add a new condition indicator
-
-1. Add the data field to `src/types/weather.ts`
-2. Add helper functions to `src/lib/weatherHelpers.ts`
-3. Add `<ConditionIndicator>` in `src/app/page.tsx`
-
-### Change the refresh interval
-
-Edit `refreshInterval` in `src/lib/config.ts` (milliseconds)
-
-### Add a new data source on the Pi
-
-1. Add a new reader function in `raspberry-pi/collector.py`
-2. Start it as a daemon thread in `main()`
-3. Call `data_store.update()` with the new values
+```bash
+npm run dev      # Start development server
+npm run build    # Build for production
+npm run lint     # Run ESLint
+```
 
 ## Debugging
 
-- **Browser console** (F12) for frontend errors
-- **Vercel logs** for API errors
-- **`journalctl -u observatory-collector -f`** for Pi collector logs
+### Check Heartbeat Status
+```bash
+curl -s "https://observatory-dashboard.vercel.app/api/heartbeat?debug=true" | python3 -m json.tool
+```
 
-## Mock Data
+### Check Instrument Health
+```bash
+curl -s "https://observatory-dashboard.vercel.app/api/current" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+th = d.get('telemetryHealth', {})
+print(f'Status: {th.get(\"status\")}')
+for code, r in d.get('instrumentReadings', {}).items():
+    print(f'  {code}: {r.get(\"status\")}')
+"
+```
 
-When Supabase isn't configured or there's no data, the `/api/current` endpoint returns mock data. This is useful for development.
+### Pi Collector Logs
+```bash
+ssh observatory-pi "sudo journalctl -u observatory-collector -f"
+```
+
+## Common Issues
+
+### Instruments showing offline after restart
+The collector has a grace period of 3 readings before reporting problems. Wait ~3 minutes for instruments to establish healthy status.
+
+### Health not updating
+Check the KV rate limiting - writes are limited to 120s intervals. Debug with `/api/heartbeat?debug=true`.
+
+### Stale data
+The collector sends heartbeats every 60s. If heartbeat age > 5 minutes, status shows as "stale".
