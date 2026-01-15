@@ -107,9 +107,13 @@ class InstrumentHealthTracker:
     - HEALTHY: < 20% failure rate (default, not explicitly sent)
     - DEGRADED: 20-80% failure rate
     - OFFLINE: > 80% failure rate
+
+    Requires MIN_READINGS before reporting degraded/offline status.
+    This prevents false alarms on startup or after restart.
     """
 
     WINDOW_SIZE = 10  # Track last 10 readings
+    MIN_READINGS = 3  # Need at least 3 readings before reporting problems
     DEGRADED_THRESHOLD = 0.2  # 20% failures = degraded
     OFFLINE_THRESHOLD = 0.8   # 80% failures = offline
 
@@ -139,12 +143,16 @@ class InstrumentHealthTracker:
         """
         Get health status for an instrument.
         Returns: "HEALTHY", "DEGRADED", or "OFFLINE"
+
+        Requires MIN_READINGS before reporting problems - this gives
+        instruments time to establish a pattern after startup.
         """
         with self._lock:
             history = self._history.get(instrument_code, [])
 
-            if not history:
-                return "HEALTHY"  # No data yet, assume healthy
+            # Not enough data yet - assume healthy (grace period)
+            if len(history) < self.MIN_READINGS:
+                return "HEALTHY"
 
             failure_count = sum(1 for success in history if not success)
             failure_rate = failure_count / len(history)
