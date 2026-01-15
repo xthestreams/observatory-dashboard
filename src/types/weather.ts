@@ -37,6 +37,21 @@ export interface HistoricalReading {
   instrumentCode?: string;  // Which instrument provided this reading
 }
 
+/**
+ * Weather history for sparklines (24h trends)
+ */
+export interface WeatherHistory {
+  timestamp: string;
+  temperature?: number | null;
+  humidity?: number | null;
+  pressure?: number | null;
+  dewpoint?: number | null;
+  wind_speed?: number | null;
+  wind_gust?: number | null;
+  sky_temp?: number | null;
+  ambient_temp?: number | null;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Instrument Types
 // ─────────────────────────────────────────────────────────────────────────────
@@ -142,6 +157,9 @@ export interface ApiResponse {
 
   // Per-instrument SQM history (for multi-SQM graph)
   sqmHistoryByInstrument?: Record<string, HistoricalReading[]>;
+
+  // Weather history for sparklines (24h trends, sampled)
+  weatherHistory?: WeatherHistory[];
 
   // Per-instrument current values (for detail modal)
   instrumentReadings?: Record<string, InstrumentReading>;

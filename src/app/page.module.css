@@ -222,15 +222,21 @@
   color: #60a5fa;
 }
 
-/* Conditions - compact 2x3 grid to match Sky Quality panel size */
-.conditionsPanel {
-  grid-column: span 1;
+/* Sky Conditions Panel - Full Width */
+.skyConditionsPanel {
+  grid-column: span 4;
 }
 
-.conditionsGrid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.5rem;
+@media (max-width: 1200px) {
+  .skyConditionsPanel {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 600px) {
+  .skyConditionsPanel {
+    grid-column: span 1;
+  }
 }
 
 /* BOM Images - simple display without extra borders */

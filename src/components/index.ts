@@ -6,3 +6,5 @@ export { SatellitePanel } from "./SatellitePanel";
 export { AstronomyPanel } from "./AstronomyPanel";
 export { ObservatoryInfo } from "./ObservatoryInfo";
 export { WindCompass } from "./WindCompass";
+export { Sparkline } from "./Sparkline";
+export { SkyConditionsPanel } from "./SkyConditionsPanel";

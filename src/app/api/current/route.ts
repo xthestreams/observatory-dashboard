@@ -4,7 +4,7 @@ import {
   fetchLatestInstrumentReadings,
 } from "@/lib/instruments";
 import { getTelemetryHealth, getAggregatedConditions } from "@/lib/telemetryKV";
-import { WeatherData, HistoricalReading, ApiResponse, CloudCondition, RainCondition, WindCondition, DayCondition, FailedInstrument, InstrumentReading } from "@/types/weather";
+import { WeatherData, HistoricalReading, WeatherHistory, ApiResponse, CloudCondition, RainCondition, WindCondition, DayCondition, FailedInstrument, InstrumentReading } from "@/types/weather";
 
 // Force dynamic rendering - this route fetches live data
 export const dynamic = "force-dynamic";
@@ -249,6 +249,79 @@ export async function GET() {
       }
     }
 
+    // Fetch weather history for sparklines (24h, sampled every 30 minutes)
+    let weatherHistory: WeatherHistory[] = [];
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+    const { data: rawWeatherHistory } = await supabase
+      .from("instrument_readings")
+      .select("created_at, temperature, humidity, pressure, dewpoint, wind_speed, wind_gust, sky_temp, ambient_temp")
+      .gte("created_at", twentyFourHoursAgo)
+      .eq("is_outlier", false)
+      .order("created_at", { ascending: true })
+      .limit(2000);
+
+    if (rawWeatherHistory && rawWeatherHistory.length > 0) {
+      // Group into 30-minute windows and average
+      const windowMs = 30 * 60 * 1000;
+      const windows: Map<number, {
+        timestamp: string;
+        temperature: number[];
+        humidity: number[];
+        pressure: number[];
+        dewpoint: number[];
+        wind_speed: number[];
+        wind_gust: number[];
+        sky_temp: number[];
+        ambient_temp: number[];
+      }> = new Map();
+
+      for (const reading of rawWeatherHistory) {
+        const ts = new Date(reading.created_at).getTime();
+        const windowStart = Math.floor(ts / windowMs) * windowMs;
+
+        if (!windows.has(windowStart)) {
+          windows.set(windowStart, {
+            timestamp: reading.created_at,
+            temperature: [],
+            humidity: [],
+            pressure: [],
+            dewpoint: [],
+            wind_speed: [],
+            wind_gust: [],
+            sky_temp: [],
+            ambient_temp: [],
+          });
+        }
+        const w = windows.get(windowStart)!;
+        if (reading.temperature !== null) w.temperature.push(reading.temperature);
+        if (reading.humidity !== null) w.humidity.push(reading.humidity);
+        if (reading.pressure !== null) w.pressure.push(reading.pressure);
+        if (reading.dewpoint !== null) w.dewpoint.push(reading.dewpoint);
+        if (reading.wind_speed !== null) w.wind_speed.push(reading.wind_speed);
+        if (reading.wind_gust !== null) w.wind_gust.push(reading.wind_gust);
+        if (reading.sky_temp !== null) w.sky_temp.push(reading.sky_temp);
+        if (reading.ambient_temp !== null) w.ambient_temp.push(reading.ambient_temp);
+      }
+
+      const avg = (arr: number[]): number | null => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+      const max = (arr: number[]): number | null => arr.length > 0 ? Math.max(...arr) : null;
+
+      weatherHistory = Array.from(windows.entries())
+        .sort((a, b) => a[0] - b[0])
+        .map(([, w]) => ({
+          timestamp: w.timestamp,
+          temperature: avg(w.temperature),
+          humidity: avg(w.humidity),
+          pressure: avg(w.pressure),
+          dewpoint: avg(w.dewpoint),
+          wind_speed: avg(w.wind_speed),
+          wind_gust: max(w.wind_gust),
+          sky_temp: avg(w.sky_temp),
+          ambient_temp: avg(w.ambient_temp),
+        }));
+    }
+
     // Get telemetry health from KV state FIRST
     // This is the source of truth for instrument health (from collector)
     const telemetryHealth = await getTelemetryHealth();
@@ -307,6 +380,7 @@ export async function GET() {
       current: current || getMockData(),
       sqmHistory: sqmHistory.length > 0 ? sqmHistory : getMockSQMHistory(),
       sqmHistoryByInstrument: Object.keys(sqmHistoryByInstrument).length > 0 ? sqmHistoryByInstrument : undefined,
+      weatherHistory: weatherHistory.length > 0 ? weatherHistory : undefined,
       instrumentReadings,
       failedInstruments,
       telemetryHealth,

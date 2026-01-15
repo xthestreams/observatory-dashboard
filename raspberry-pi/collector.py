@@ -740,6 +740,16 @@ def read_cloudwatcher_device(device_config: dict):
             if "temp" in data:
                 updates["ambient_temp"] = float(data["temp"])
 
+            # Humidity, dewpoint, and pressure (if available)
+            if "hum" in data:
+                updates["humidity"] = float(data["hum"])
+            if "dewp" in data:
+                updates["dewpoint"] = float(data["dewp"])
+            if "relpress" in data:
+                pressure = float(data["relpress"])
+                if pressure > 0:  # Only include if sensor is reporting valid data
+                    updates["pressure"] = round(pressure, 1)
+
             # Cloud condition (cloudsSafe: 1=safe/clear, 0=unsafe/cloudy)
             if "cloudsSafe" in data:
                 updates["cloud_condition"] = "Clear" if data["cloudsSafe"] == "1" else "Cloudy"
@@ -765,6 +775,12 @@ def read_cloudwatcher_device(device_config: dict):
                     updates["day_condition"] = "Light"
                 else:
                     updates["day_condition"] = "VeryLight"
+
+            # Wind speed and gust (in km/h from Cloudwatcher)
+            if "wind" in data:
+                updates["wind_speed"] = float(data["wind"])
+            if "gust" in data:
+                updates["wind_gust"] = float(data["gust"])
 
             # Wind condition (windSafe: 1=calm, 0=windy)
             if "windSafe" in data:

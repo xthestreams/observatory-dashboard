@@ -5,6 +5,7 @@ import { siteConfig } from "@/lib/config";
 import {
   WeatherData,
   HistoricalReading,
+  WeatherHistory,
   ApiResponse,
   InstrumentReading,
   FailedInstrument,
@@ -12,26 +13,18 @@ import {
   TelemetryHealth,
 } from "@/types/weather";
 import {
-  ConditionIndicator,
   WeatherStat,
   SQMGauge,
   SQMGraph,
   AstronomyPanel,
   ObservatoryInfo,
-  WindCompass,
+  SkyConditionsPanel,
 } from "@/components";
 import InstrumentAlert from "@/components/InstrumentAlert";
 import InstrumentDetailModal from "@/components/InstrumentDetailModal";
 import ForecastPanel from "@/components/ForecastPanel";
 import AllSkyPanel from "@/components/AllSkyPanel";
 import {
-  getCloudIcon,
-  getWindIcon,
-  getRainIcon,
-  getDayIcon,
-  getConditionColor,
-  getHumidityCondition,
-  getTempCondition,
   getWindDirection,
 } from "@/lib/weatherHelpers";
 import { getInstrumentsForMetric, countInstrumentsForMetric } from "@/lib/instruments";
@@ -41,6 +34,7 @@ export default function Dashboard() {
   const [data, setData] = useState<WeatherData | null>(null);
   const [sqmHistory, setSqmHistory] = useState<HistoricalReading[]>([]);
   const [sqmHistoryByInstrument, setSqmHistoryByInstrument] = useState<Record<string, HistoricalReading[]>>({});
+  const [weatherHistory, setWeatherHistory] = useState<WeatherHistory[]>([]);
   const [allskyUrl, setAllskyUrl] = useState<string>("/api/allsky/latest.jpg");
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -66,6 +60,7 @@ export default function Dashboard() {
         setData(json.current);
         setSqmHistory(json.sqmHistory || []);
         setSqmHistoryByInstrument(json.sqmHistoryByInstrument || {});
+        setWeatherHistory(json.weatherHistory || []);
         setInstrumentReadings(json.instrumentReadings || {});
         setFailedInstruments(json.failedInstruments || []);
         setTelemetryHealth(json.telemetryHealth || null);
@@ -213,85 +208,18 @@ export default function Dashboard() {
           <AllSkyPanel imageUrl={allskyUrl} />
         </section>
 
-        {/* Row 2: Sky Conditions, BOM Radar, BOM Satellite Visible, BOM Satellite Infrared */}
-
-        {/* Cloudwatcher Conditions */}
-        <section className={`${styles.panel} ${styles.conditionsPanel}`}>
+        {/* Row 2: Sky Conditions - Full Width */}
+        <section className={`${styles.panel} ${styles.skyConditionsPanel}`}>
           <h2 className={styles.panelTitle}>Sky Conditions</h2>
-          <div className={styles.conditionsGrid}>
-            <ConditionIndicator
-              label="Cloud"
-              condition={data?.cloud_condition ?? "Unknown"}
-              icon={getCloudIcon(data?.cloud_condition)}
-              color={getConditionColor(data?.cloud_condition, "cloud")}
-              detail={
-                data?.sky_temp && data?.ambient_temp
-                  ? `Δ ${(data.sky_temp - data.ambient_temp).toFixed(1)}°C`
-                  : undefined
-              }
-              onClick={() => handleMetricClick("cloud_condition")}
-            />
-            <ConditionIndicator
-              label="Wind"
-              condition={data?.wind_condition ?? "Unknown"}
-              icon={getWindIcon(data?.wind_condition)}
-              color={getConditionColor(data?.wind_condition, "wind")}
-              detail={
-                data?.wind_speed
-                  ? `${data.wind_speed.toFixed(1)} km/h`
-                  : undefined
-              }
-              onClick={() => handleMetricClick("wind_condition")}
-            />
-            <ConditionIndicator
-              label="Rain"
-              condition={data?.rain_condition ?? "Unknown"}
-              icon={getRainIcon(data?.rain_condition)}
-              color={getConditionColor(data?.rain_condition, "rain")}
-              onClick={() => handleMetricClick("rain_condition")}
-            />
-            <ConditionIndicator
-              label="Humidity"
-              condition={getHumidityCondition(data?.humidity)}
-              icon="💧"
-              color={getConditionColor(
-                getHumidityCondition(data?.humidity),
-                "humidity"
-              )}
-              detail={
-                data?.humidity ? `${data.humidity.toFixed(0)}%` : undefined
-              }
-              onClick={() => handleMetricClick("humidity")}
-            />
-            <ConditionIndicator
-              label="Daylight"
-              condition={data?.day_condition ?? "Unknown"}
-              icon={getDayIcon(data?.day_condition)}
-              color={getConditionColor(data?.day_condition, "day")}
-              onClick={() => handleMetricClick("day_condition")}
-            />
-            <ConditionIndicator
-              label="Temperature"
-              condition={getTempCondition(data?.temperature)}
-              icon="🌡️"
-              color={getConditionColor(
-                getTempCondition(data?.temperature),
-                "temp"
-              )}
-              detail={
-                data?.temperature
-                  ? `${data.temperature.toFixed(1)}°C`
-                  : undefined
-              }
-              onClick={() => handleMetricClick("temperature")}
-            />
-            <WindCompass
-              direction={data?.wind_direction ?? null}
-              speed={data?.wind_speed ?? null}
-              gust={data?.wind_gust ?? null}
-            />
-          </div>
+          <SkyConditionsPanel
+            data={data}
+            weatherHistory={weatherHistory}
+            onMetricClick={handleMetricClick}
+            getInstrumentCount={getInstrumentCount}
+          />
         </section>
+
+        {/* Row 3: BOM Radar, BOM Satellite Visible, BOM Satellite Infrared, Forecast */}
 
         {/* BOM Radar */}
         <section className={styles.panel}>
