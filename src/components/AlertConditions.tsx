@@ -26,98 +26,86 @@ export function AlertConditions({ data, onMetricClick }: AlertConditionsProps) {
 
   return (
     <div className={styles.container}>
-      {/* Cloud */}
-      <div
-        className={styles.conditionItem}
-        onClick={() => handleClick("cloud_condition")}
-        role="button"
-        tabIndex={0}
-      >
-        <div className={styles.icon}>{getCloudIcon(data?.cloud_condition)}</div>
-        <div className={styles.content}>
-          <div className={styles.label}>Cloud</div>
-          <div
-            className={styles.status}
-            style={{ color: getConditionColor(data?.cloud_condition, "cloud") }}
-          >
-            {data?.cloud_condition ?? "Unknown"}
-          </div>
-          {data?.sky_temp !== null && data?.ambient_temp !== null && (
-            <div className={styles.detail}>
-              Δ {((data?.sky_temp ?? 0) - (data?.ambient_temp ?? 0)).toFixed(1)}°
+      {/* Top row: 4 condition boxes */}
+      <div className={styles.conditionsRow}>
+        {/* Cloud */}
+        <div
+          className={styles.conditionItem}
+          onClick={() => handleClick("cloud_condition")}
+          role="button"
+          tabIndex={0}
+        >
+          <div className={styles.icon}>{getCloudIcon(data?.cloud_condition)}</div>
+          <div className={styles.content}>
+            <div className={styles.label}>Cloud</div>
+            <div
+              className={styles.status}
+              style={{ color: getConditionColor(data?.cloud_condition, "cloud") }}
+            >
+              {data?.cloud_condition ?? "--"}
             </div>
-          )}
-        </div>
-      </div>
-
-      {/* Wind */}
-      <div
-        className={styles.conditionItem}
-        onClick={() => handleClick("wind_condition")}
-        role="button"
-        tabIndex={0}
-      >
-        <div className={styles.icon}>{getWindIcon(data?.wind_condition)}</div>
-        <div className={styles.content}>
-          <div className={styles.label}>Wind</div>
-          <div
-            className={styles.status}
-            style={{ color: getConditionColor(data?.wind_condition, "wind") }}
-          >
-            {data?.wind_condition ?? "Unknown"}
           </div>
-          {data?.wind_speed !== null && data?.wind_speed !== undefined && (
-            <div className={styles.detail}>
-              {data.wind_speed.toFixed(0)} km/h
+        </div>
+
+        {/* Wind */}
+        <div
+          className={styles.conditionItem}
+          onClick={() => handleClick("wind_condition")}
+          role="button"
+          tabIndex={0}
+        >
+          <div className={styles.icon}>{getWindIcon(data?.wind_condition)}</div>
+          <div className={styles.content}>
+            <div className={styles.label}>Wind</div>
+            <div
+              className={styles.status}
+              style={{ color: getConditionColor(data?.wind_condition, "wind") }}
+            >
+              {data?.wind_condition ?? "--"}
             </div>
-          )}
-        </div>
-      </div>
-
-      {/* Rain */}
-      <div
-        className={styles.conditionItem}
-        onClick={() => handleClick("rain_condition")}
-        role="button"
-        tabIndex={0}
-      >
-        <div className={styles.icon}>{getRainIcon(data?.rain_condition)}</div>
-        <div className={styles.content}>
-          <div className={styles.label}>Rain</div>
-          <div
-            className={styles.status}
-            style={{ color: getConditionColor(data?.rain_condition, "rain") }}
-          >
-            {data?.rain_condition ?? "Unknown"}
           </div>
-          {data?.rain_rate !== null && data?.rain_rate !== undefined && data.rain_rate > 0 && (
-            <div className={styles.detail}>
-              {data.rain_rate.toFixed(1)} mm/hr
+        </div>
+
+        {/* Rain */}
+        <div
+          className={styles.conditionItem}
+          onClick={() => handleClick("rain_condition")}
+          role="button"
+          tabIndex={0}
+        >
+          <div className={styles.icon}>{getRainIcon(data?.rain_condition)}</div>
+          <div className={styles.content}>
+            <div className={styles.label}>Rain</div>
+            <div
+              className={styles.status}
+              style={{ color: getConditionColor(data?.rain_condition, "rain") }}
+            >
+              {data?.rain_condition ?? "--"}
             </div>
-          )}
+          </div>
         </div>
-      </div>
 
-      {/* Daylight */}
-      <div
-        className={styles.conditionItem}
-        onClick={() => handleClick("day_condition")}
-        role="button"
-        tabIndex={0}
-      >
-        <div className={styles.icon}>{getDayIcon(data?.day_condition)}</div>
-        <div className={styles.content}>
-          <div className={styles.label}>Daylight</div>
-          <div
-            className={styles.status}
-            style={{ color: getConditionColor(data?.day_condition, "day") }}
-          >
-            {data?.day_condition ?? "Unknown"}
+        {/* Daylight */}
+        <div
+          className={styles.conditionItem}
+          onClick={() => handleClick("day_condition")}
+          role="button"
+          tabIndex={0}
+        >
+          <div className={styles.icon}>{getDayIcon(data?.day_condition)}</div>
+          <div className={styles.content}>
+            <div className={styles.label}>Light</div>
+            <div
+              className={styles.status}
+              style={{ color: getConditionColor(data?.day_condition, "day") }}
+            >
+              {data?.day_condition ?? "--"}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Wind Compass */}
+      {/* Compass fills remaining space */}
       <div className={styles.compassWrapper}>
         <WindCompass
           direction={data?.wind_direction ?? null}
