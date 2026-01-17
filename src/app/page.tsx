@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { siteConfig } from "@/lib/config";
 import {
   WeatherData,
@@ -40,6 +40,15 @@ export default function Dashboard() {
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // History window state (persisted to localStorage)
+  const [historyHours, setHistoryHours] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("historyHours");
+      return saved ? parseInt(saved, 10) : 1;
+    }
+    return 1;
+  });
+
   // Multi-instrument state
   const [instrumentReadings, setInstrumentReadings] = useState<Record<string, InstrumentReading>>({});
   const [failedInstruments, setFailedInstruments] = useState<FailedInstrument[]>([]);
@@ -47,15 +56,9 @@ export default function Dashboard() {
   const [selectedMetric, setSelectedMetric] = useState<MetricName | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
-  useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, siteConfig.refreshInterval);
-    return () => clearInterval(interval);
-  }, []);
-
-  async function fetchData() {
+  const fetchData = useCallback(async () => {
     try {
-      const res = await fetch("/api/current");
+      const res = await fetch(`/api/current?historyHours=${historyHours}`);
       if (res.ok) {
         const json: ApiResponse = await res.json();
         setData(json.current);
@@ -72,9 +75,21 @@ export default function Dashboard() {
     } finally {
       setIsLoading(false);
     }
-    // Bust cache on allsky image
-    setAllskyUrl(`/api/allsky/latest.jpg?t=${Date.now()}`);
-  }
+    // Update allsky image URL (remove aggressive cache busting)
+    setAllskyUrl(`/api/allsky/latest.jpg`);
+  }, [historyHours]);
+
+  useEffect(() => {
+    fetchData();
+    const interval = setInterval(fetchData, siteConfig.refreshInterval);
+    return () => clearInterval(interval);
+  }, [fetchData]);
+
+  // Handle history window change
+  const handleHistoryChange = (hours: number) => {
+    setHistoryHours(hours);
+    localStorage.setItem("historyHours", hours.toString());
+  };
 
   const handleMetricClick = (metric: MetricName) => {
     setSelectedMetric(metric);
@@ -131,7 +146,12 @@ export default function Dashboard() {
       />
 
       {/* Row 0: Full-width Header Bar */}
-      <HeaderBar telemetryHealth={telemetryHealth} lastUpdate={lastUpdate} />
+      <HeaderBar
+        telemetryHealth={telemetryHealth}
+        lastUpdate={lastUpdate}
+        historyHours={historyHours}
+        onHistoryChange={handleHistoryChange}
+      />
 
       <main className={styles.mainGrid}>
         {/* Row 1: Alert Conditions, SQM, Radar, AllSky */}
@@ -182,7 +202,7 @@ export default function Dashboard() {
           <h2 className={styles.panelTitle}>Radar</h2>
           <div className={styles.bomImageContainer}>
             <img
-              src={`/api/bom-satellite/IDR691?t=${Math.floor(Date.now() / 60000)}`}
+              src="/api/bom-satellite/IDR691"
               alt="BOM Radar"
               className={styles.bomImage}
             />
@@ -222,7 +242,7 @@ export default function Dashboard() {
           <h2 className={styles.panelTitle}>Satellite (Visible)</h2>
           <div className={styles.bomImageContainer}>
             <img
-              src={`/api/bom-satellite/IDE00005?t=${Math.floor(Date.now() / 60000)}`}
+              src="/api/bom-satellite/IDE00005"
               alt="BOM Satellite Visible"
               className={styles.bomImage}
             />
@@ -234,7 +254,7 @@ export default function Dashboard() {
           <h2 className={styles.panelTitle}>Satellite (Infrared)</h2>
           <div className={styles.bomImageContainer}>
             <img
-              src={`/api/bom-satellite/IDE00006?t=${Math.floor(Date.now() / 60000)}`}
+              src="/api/bom-satellite/IDE00006"
               alt="BOM Satellite Infrared"
               className={styles.bomImage}
             />

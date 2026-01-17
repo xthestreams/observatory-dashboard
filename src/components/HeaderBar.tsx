@@ -5,12 +5,24 @@ import { TelemetryHealth, PowerStatus } from "@/types/weather";
 import { formatRelativeTime } from "@/lib/instruments";
 import styles from "./HeaderBar.module.css";
 
+// History window options (in hours)
+const HISTORY_OPTIONS = [
+  { value: 1, label: "1h" },
+  { value: 4, label: "4h" },
+  { value: 8, label: "8h" },
+  { value: 12, label: "12h" },
+  { value: 24, label: "24h" },
+  { value: 48, label: "48h" },
+];
+
 interface HeaderBarProps {
   telemetryHealth?: TelemetryHealth | null;
   lastUpdate?: Date | null;
+  historyHours?: number;
+  onHistoryChange?: (hours: number) => void;
 }
 
-export function HeaderBar({ telemetryHealth, lastUpdate }: HeaderBarProps) {
+export function HeaderBar({ telemetryHealth, lastUpdate, historyHours = 1, onHistoryChange }: HeaderBarProps) {
   const location = getDisplayLocation();
   const hasMpcCodes = siteConfig.mpcCodes && siteConfig.mpcCodes.length > 0;
 
@@ -235,6 +247,28 @@ export function HeaderBar({ telemetryHealth, lastUpdate }: HeaderBarProps) {
           )}
         </div>
       </div>
+
+      {/* History Window */}
+      {onHistoryChange && (
+        <div className={styles.infoGroup}>
+          <span className={styles.groupIcon}>📊</span>
+          <div className={styles.groupContent}>
+            <span className={styles.updateLabel}>History</span>
+            <select
+              className={styles.historySelect}
+              value={historyHours}
+              onChange={(e) => onHistoryChange(parseInt(e.target.value, 10))}
+              aria-label="History window"
+            >
+              {HISTORY_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
 
       {/* Last Update */}
       <div className={styles.updateTime}>

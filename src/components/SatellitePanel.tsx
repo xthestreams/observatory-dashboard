@@ -60,7 +60,8 @@ function SatelliteImage({ product, isExpanded, onToggleExpand }: SatelliteImageP
   const [hasError, setHasError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  const imageUrl = `${getBomImageUrl(product.id)}?t=${Math.floor(Date.now() / 60000)}`; // Cache bust every minute
+  // Use API's built-in caching (5 minutes) - no need for client-side cache busting
+  const imageUrl = getBomImageUrl(product.id);
 
   return (
     <div

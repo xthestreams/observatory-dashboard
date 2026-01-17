@@ -868,7 +868,6 @@ class NUTClient:
             self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self._socket.settimeout(10)
             self._socket.connect((self.host, self.port))
-            logger.debug(f"NUT: Connected to {self.host}:{self.port}")
             return True
         except Exception as e:
             logger.warning(f"NUT connect error: {e}")
@@ -888,32 +887,25 @@ class NUTClient:
     def _send_command(self, cmd: str) -> list:
         """Send a command and return response lines."""
         if not self._socket:
-            logger.debug("NUT: No socket connection")
             return []
 
         try:
             self._socket.sendall(f"{cmd}\n".encode())
 
             response = b""
-            chunk_count = 0
             while True:
                 chunk = self._socket.recv(4096)
-                chunk_count += 1
                 if not chunk:
-                    logger.debug(f"NUT: Empty chunk received after {chunk_count} chunks")
                     break
                 response += chunk
                 # Check for end markers - NUT uses "END LIST ..." or "OK" or "ERR ..."
                 decoded = response.decode("utf-8", errors="ignore")
                 if "\nEND " in decoded or "\nOK\n" in decoded or decoded.endswith("OK\n"):
-                    logger.debug(f"NUT: Found end marker after {chunk_count} chunks, {len(response)} bytes")
                     break
                 if "ERR " in decoded:
-                    logger.debug(f"NUT: Found ERR in response: {decoded[:100]}")
                     break
 
             lines = response.decode("utf-8", errors="ignore").strip().split("\n")
-            logger.debug(f"NUT: Returning {len(lines)} lines")
             return lines
         except Exception as e:
             logger.warning(f"NUT command error: {e}")
@@ -1586,7 +1578,6 @@ def push_heartbeat():
             power_status = None
             if CONFIG["nut_ups_name"]:
                 power_status = power_tracker.get_status()
-                logger.info(f"Heartbeat power_status: {power_status}")
 
             payload = {
                 "instruments": active_instruments,

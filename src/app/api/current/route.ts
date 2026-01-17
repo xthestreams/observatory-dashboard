@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase";
 import {
   fetchLatestInstrumentReadings,
@@ -6,10 +6,30 @@ import {
 import { getTelemetryHealth, getAggregatedConditions } from "@/lib/telemetryKV";
 import { WeatherData, HistoricalReading, WeatherHistory, ApiResponse, CloudCondition, RainCondition, WindCondition, DayCondition, FailedInstrument, InstrumentReading } from "@/types/weather";
 
-// Force dynamic rendering - this route fetches live data
-export const dynamic = "force-dynamic";
+// Cache response for 30 seconds to reduce origin transfers
+// Data is pushed every 60 seconds from collector, so 30s cache is a good balance
+export const revalidate = 30;
 
-export async function GET() {
+// Valid history window options in hours
+const VALID_HISTORY_HOURS = [1, 4, 8, 12, 24, 48];
+const DEFAULT_HISTORY_HOURS = 1; // Default to 1 hour (matches ~60 samples at 1min intervals)
+
+export async function GET(request: NextRequest) {
+  // Parse history window from query parameter
+  const searchParams = request.nextUrl.searchParams;
+  const historyHoursParam = searchParams.get("historyHours");
+
+  let historyHours = DEFAULT_HISTORY_HOURS;
+  if (historyHoursParam) {
+    const parsed = parseInt(historyHoursParam, 10);
+    if (VALID_HISTORY_HOURS.includes(parsed)) {
+      historyHours = parsed;
+    }
+  }
+
+  // Calculate limit based on history window
+  // Assuming ~1 sample per minute per instrument, scale limit accordingly
+  const historyLimit = Math.min(historyHours * 60, 3000); // Cap at 3000 to prevent huge queries
   try {
     const supabase = createServiceClient();
 
@@ -165,17 +185,17 @@ export async function GET() {
       (instruments || []).map((i: { id: string; code: string }) => [i.id, i.code])
     );
 
+    // Use historyHours for the time window, historyLimit for max records
+    const historyStartTime = new Date(Date.now() - historyHours * 60 * 60 * 1000).toISOString();
+
     const { data: newSqmHistory, error: newHistoryError } = await supabase
       .from("instrument_readings")
       .select("created_at, sky_quality, instrument_id")
       .not("sky_quality", "is", null)
       .eq("is_outlier", false)
-      .gte(
-        "created_at",
-        new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-      )
+      .gte("created_at", historyStartTime)
       .order("created_at", { ascending: true })
-      .limit(1000); // Higher limit to accommodate multiple instruments
+      .limit(historyLimit);
 
     if (newSqmHistory && !newHistoryError && newSqmHistory.length > 0) {
       // Group by instrument
@@ -230,12 +250,9 @@ export async function GET() {
         .from("weather_readings")
         .select("created_at, sky_quality")
         .not("sky_quality", "is", null)
-        .gte(
-          "created_at",
-          new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-        )
+        .gte("created_at", historyStartTime)
         .order("created_at", { ascending: true })
-        .limit(48);
+        .limit(historyLimit);
 
       if (legacyHistory && legacyHistory.length > 0) {
         sqmHistory = legacyHistory.map(
@@ -249,17 +266,16 @@ export async function GET() {
       }
     }
 
-    // Fetch weather history for sparklines (24h, sampled every 30 minutes)
+    // Fetch weather history for sparklines (using same history window)
     let weatherHistory: WeatherHistory[] = [];
-    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
     const { data: rawWeatherHistory } = await supabase
       .from("instrument_readings")
       .select("created_at, temperature, humidity, pressure, dewpoint, wind_speed, wind_gust, sky_temp, ambient_temp")
-      .gte("created_at", twentyFourHoursAgo)
+      .gte("created_at", historyStartTime)
       .eq("is_outlier", false)
       .order("created_at", { ascending: true })
-      .limit(2000);
+      .limit(historyLimit);
 
     if (rawWeatherHistory && rawWeatherHistory.length > 0) {
       // Group into 30-minute windows and average
