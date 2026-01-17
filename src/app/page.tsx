@@ -223,6 +223,7 @@ export default function Dashboard() {
             weatherHistory={weatherHistory}
             onMetricClick={handleMetricClick}
             getInstrumentCount={getInstrumentCount}
+            historyHours={historyHours}
           />
         </section>
 

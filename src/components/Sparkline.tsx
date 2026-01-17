@@ -7,12 +7,13 @@ interface SparklineProps {
   color?: string;
   showMinMax?: boolean;
   showAxes?: boolean;
-  unit?: string;
+  historyHours?: number; // Time window in hours (1, 4, 8, 12, 24, 48)
 }
 
 /**
- * Sparkline component for showing 24h trends with optional axes
- * Renders an SVG line chart with time axis (6h ticks) and Y-axis (auto-scaled)
+ * Sparkline component for showing trends with optional axes
+ * Renders an SVG line chart with time axis and Y-axis (auto-scaled)
+ * Time axis labels adapt to the historyHours window
  */
 export function Sparkline({
   data,
@@ -21,7 +22,7 @@ export function Sparkline({
   color = "#60a5fa",
   showMinMax = false,
   showAxes = false,
-  unit = "",
+  historyHours = 1,
 }: SparklineProps) {
   if (!data || data.length < 2) {
     return (
@@ -111,10 +112,46 @@ export function Sparkline({
     return Math.round(value).toString();
   };
 
-  // 6-hour tick positions (for 24h of data)
-  const timeTickPositions = [0, 0.25, 0.5, 0.75, 1].map(ratio => ({
-    x: leftPadding + ratio * chartWidth,
-    label: ratio === 0 ? "-24h" : ratio === 0.25 ? "-18h" : ratio === 0.5 ? "-12h" : ratio === 0.75 ? "-6h" : "now"
+  // Generate time tick labels based on historyHours
+  const generateTimeLabels = () => {
+    // For shorter windows, show fewer ticks with appropriate labels
+    if (historyHours <= 1) {
+      // 1 hour: show -60m, -30m, now
+      return [
+        { ratio: 0, label: `-${historyHours * 60}m` },
+        { ratio: 0.5, label: `-${historyHours * 30}m` },
+        { ratio: 1, label: "now" },
+      ];
+    } else if (historyHours <= 4) {
+      // 4 hours: show -4h, -2h, now
+      return [
+        { ratio: 0, label: `-${historyHours}h` },
+        { ratio: 0.5, label: `-${Math.round(historyHours / 2)}h` },
+        { ratio: 1, label: "now" },
+      ];
+    } else if (historyHours <= 12) {
+      // 8-12 hours: show 4 ticks
+      return [
+        { ratio: 0, label: `-${historyHours}h` },
+        { ratio: 0.33, label: `-${Math.round(historyHours * 2 / 3)}h` },
+        { ratio: 0.67, label: `-${Math.round(historyHours / 3)}h` },
+        { ratio: 1, label: "now" },
+      ];
+    } else {
+      // 24-48 hours: show 5 ticks
+      return [
+        { ratio: 0, label: `-${historyHours}h` },
+        { ratio: 0.25, label: `-${Math.round(historyHours * 0.75)}h` },
+        { ratio: 0.5, label: `-${Math.round(historyHours / 2)}h` },
+        { ratio: 0.75, label: `-${Math.round(historyHours / 4)}h` },
+        { ratio: 1, label: "now" },
+      ];
+    }
+  };
+
+  const timeTickPositions = generateTimeLabels().map(tick => ({
+    x: leftPadding + tick.ratio * chartWidth,
+    label: tick.label
   }));
 
   const yTicks = showAxes ? generateYTicks() : [];

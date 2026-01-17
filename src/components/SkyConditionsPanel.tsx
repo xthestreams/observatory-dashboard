@@ -14,10 +14,11 @@ interface SkyConditionsPanelProps {
   weatherHistory?: WeatherHistory[];
   onMetricClick?: (metric: MetricName) => void;
   getInstrumentCount?: (metric: string) => number;
+  historyHours?: number; // Time window for sparkline axis labels
 }
 
 /**
- * Full-width Sky Conditions panel with measurements and 24h sparklines
+ * Full-width Sky Conditions panel with measurements and sparklines
  * Note: Cloud, wind, rain, daylight conditions moved to AlertConditions component
  */
 export function SkyConditionsPanel({
@@ -25,6 +26,7 @@ export function SkyConditionsPanel({
   weatherHistory = [],
   onMetricClick,
   getInstrumentCount,
+  historyHours = 1,
 }: SkyConditionsPanelProps) {
   // Extract sparkline data from history
   const getSparklineData = (key: keyof WeatherHistory): number[] => {
@@ -79,7 +81,7 @@ export function SkyConditionsPanel({
             </div>
           </div>
           <div className={styles.measurementGraph}>
-            <Sparkline data={tempData} width={180} height={50} color="#f59e0b" showMinMax showAxes />
+            <Sparkline data={tempData} width={180} height={50} color="#f59e0b" showMinMax showAxes historyHours={historyHours} />
           </div>
         </div>
 
@@ -106,7 +108,7 @@ export function SkyConditionsPanel({
             </div>
           </div>
           <div className={styles.measurementGraph}>
-            <Sparkline data={humidityData} width={180} height={50} color="#3b82f6" showMinMax showAxes />
+            <Sparkline data={humidityData} width={180} height={50} color="#3b82f6" showMinMax showAxes historyHours={historyHours} />
           </div>
         </div>
 
@@ -135,7 +137,7 @@ export function SkyConditionsPanel({
             )}
           </div>
           <div className={styles.measurementGraph}>
-            <Sparkline data={dewpointData} width={180} height={50} color="#06b6d4" showMinMax showAxes />
+            <Sparkline data={dewpointData} width={180} height={50} color="#06b6d4" showMinMax showAxes historyHours={historyHours} />
           </div>
         </div>
 
@@ -164,7 +166,7 @@ export function SkyConditionsPanel({
             )}
           </div>
           <div className={styles.measurementGraph}>
-            <Sparkline data={windData} width={180} height={50} color="#8b5cf6" showMinMax showAxes />
+            <Sparkline data={windData} width={180} height={50} color="#8b5cf6" showMinMax showAxes historyHours={historyHours} />
           </div>
         </div>
 
@@ -188,7 +190,7 @@ export function SkyConditionsPanel({
             </div>
           </div>
           <div className={styles.measurementGraph}>
-            <Sparkline data={skyTempData} width={180} height={50} color="#a855f7" showMinMax showAxes />
+            <Sparkline data={skyTempData} width={180} height={50} color="#a855f7" showMinMax showAxes historyHours={historyHours} />
           </div>
         </div>
 
@@ -212,7 +214,7 @@ export function SkyConditionsPanel({
             </div>
           </div>
           <div className={styles.measurementGraph}>
-            <Sparkline data={pressureData} width={180} height={50} color="#14b8a6" showMinMax showAxes />
+            <Sparkline data={pressureData} width={180} height={50} color="#14b8a6" showMinMax showAxes historyHours={historyHours} />
           </div>
         </div>
       </div>
