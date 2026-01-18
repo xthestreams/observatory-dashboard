@@ -161,33 +161,37 @@ export function AlertConditions({ data, weatherHistory = [], historyHours = 1, o
 
       {/* Dew Point spread warning with sparkline */}
       <div className={styles.dewSection}>
-        <div className={styles.dewWarning}>
-          <div
-            className={styles.dewIndicator}
-            style={{ backgroundColor: getDewPointColor(dewWarning.level) }}
-          />
-          <div className={styles.dewContent}>
-            <span
-              className={styles.dewMessage}
-              style={{ color: getDewPointColor(dewWarning.level) }}
-            >
-              {dewWarning.message}
-            </span>
-            {dewWarning.spread !== null && (
-              <span className={styles.dewSpread}>
-                ({dewWarning.spread.toFixed(1)}°C)
+        <div className={styles.dewHeader}>
+          <div className={styles.dewWarning}>
+            <div
+              className={styles.dewIndicator}
+              style={{ backgroundColor: getDewPointColor(dewWarning.level) }}
+            />
+            <div className={styles.dewContent}>
+              <span
+                className={styles.dewMessage}
+                style={{ color: getDewPointColor(dewWarning.level) }}
+              >
+                {dewWarning.message}
               </span>
-            )}
+              {dewWarning.spread !== null && (
+                <span className={styles.dewSpread}>
+                  ({dewWarning.spread.toFixed(1)}°C spread)
+                </span>
+              )}
+            </div>
           </div>
         </div>
         {dewSpreadData.length >= 2 && (
           <div className={styles.dewSparkline}>
             <Sparkline
               data={dewSpreadData}
-              width={160}
-              height={24}
+              width={280}
+              height={60}
               color={getDewPointColor(dewWarning.level)}
               historyHours={historyHours}
+              showAxes={true}
+              showMinMax={true}
             />
           </div>
         )}
