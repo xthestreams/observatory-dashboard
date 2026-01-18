@@ -188,14 +188,21 @@ export async function GET(request: NextRequest) {
     // Use historyHours for the time window, historyLimit for max records
     const historyStartTime = new Date(Date.now() - historyHours * 60 * 60 * 1000).toISOString();
 
+    // Query with descending order to get most recent data first, then reverse
+    // This ensures we always have the latest readings even when hitting the limit
     const { data: newSqmHistory, error: newHistoryError } = await supabase
       .from("instrument_readings")
       .select("created_at, sky_quality, instrument_id")
       .not("sky_quality", "is", null)
       .eq("is_outlier", false)
       .gte("created_at", historyStartTime)
-      .order("created_at", { ascending: true })
+      .order("created_at", { ascending: false })
       .limit(historyLimit);
+
+    // Reverse to get chronological order (oldest first)
+    if (newSqmHistory) {
+      newSqmHistory.reverse();
+    }
 
     if (newSqmHistory && !newHistoryError && newSqmHistory.length > 0) {
       // Group by instrument
@@ -267,6 +274,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch weather history for sparklines (using same history window)
+    // Query with descending order to get most recent data first, then reverse
     let weatherHistory: WeatherHistory[] = [];
 
     const { data: rawWeatherHistory } = await supabase
@@ -274,8 +282,13 @@ export async function GET(request: NextRequest) {
       .select("created_at, temperature, humidity, pressure, dewpoint, wind_speed, wind_gust, sky_temp, ambient_temp")
       .gte("created_at", historyStartTime)
       .eq("is_outlier", false)
-      .order("created_at", { ascending: true })
+      .order("created_at", { ascending: false })
       .limit(historyLimit);
+
+    // Reverse to get chronological order (oldest first)
+    if (rawWeatherHistory) {
+      rawWeatherHistory.reverse();
+    }
 
     if (rawWeatherHistory && rawWeatherHistory.length > 0) {
       // Group into 30-minute windows and average
