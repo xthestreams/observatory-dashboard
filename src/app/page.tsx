@@ -159,7 +159,12 @@ export default function Dashboard() {
         {/* Alert Conditions (Cloud, Wind, Rain, Daylight + Compass) */}
         <section className={styles.panel}>
           <h2 className={styles.panelTitle}>Conditions</h2>
-          <AlertConditions data={data} onMetricClick={handleMetricClick} />
+          <AlertConditions
+            data={data}
+            weatherHistory={weatherHistory}
+            historyHours={historyHours}
+            onMetricClick={handleMetricClick}
+          />
         </section>
 
         {/* SQM Panel */}

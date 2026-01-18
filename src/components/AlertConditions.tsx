@@ -1,6 +1,6 @@
 "use client";
 
-import { WeatherData, MetricName } from "@/types/weather";
+import { WeatherData, WeatherHistory, MetricName } from "@/types/weather";
 import {
   getCloudIcon,
   getWindIcon,
@@ -9,10 +9,13 @@ import {
   getConditionColor,
 } from "@/lib/weatherHelpers";
 import { WindCompass } from "./WindCompass";
+import { Sparkline } from "./Sparkline";
 import styles from "./AlertConditions.module.css";
 
 interface AlertConditionsProps {
   data: WeatherData | null;
+  weatherHistory?: WeatherHistory[];
+  historyHours?: number;
   onMetricClick?: (metric: MetricName) => void;
 }
 
@@ -58,12 +61,22 @@ function getDewPointColor(level: "danger" | "warning" | "nominal" | "unknown"): 
 /**
  * Compact alert conditions widget showing cloud, wind, rain, daylight status and wind compass
  */
-export function AlertConditions({ data, onMetricClick }: AlertConditionsProps) {
+export function AlertConditions({ data, weatherHistory = [], historyHours = 1, onMetricClick }: AlertConditionsProps) {
   const handleClick = (metric: MetricName) => {
     onMetricClick?.(metric);
   };
 
   const dewWarning = getDewPointWarning(data?.temperature, data?.dewpoint);
+
+  // Compute dew point spread history (temperature - dewpoint)
+  const dewSpreadData = weatherHistory
+    .map(h => {
+      if (h.temperature != null && h.dewpoint != null) {
+        return h.temperature - h.dewpoint;
+      }
+      return null;
+    })
+    .filter((v): v is number => v !== null);
 
   return (
     <div className={styles.container}>
@@ -146,25 +159,38 @@ export function AlertConditions({ data, onMetricClick }: AlertConditionsProps) {
         </div>
       </div>
 
-      {/* Dew Point spread warning */}
-      <div className={styles.dewWarning}>
-        <div
-          className={styles.dewIndicator}
-          style={{ backgroundColor: getDewPointColor(dewWarning.level) }}
-        />
-        <div className={styles.dewContent}>
-          <span
-            className={styles.dewMessage}
-            style={{ color: getDewPointColor(dewWarning.level) }}
-          >
-            {dewWarning.message}
-          </span>
-          {dewWarning.spread !== null && (
-            <span className={styles.dewSpread}>
-              ({dewWarning.spread.toFixed(1)}°C)
+      {/* Dew Point spread warning with sparkline */}
+      <div className={styles.dewSection}>
+        <div className={styles.dewWarning}>
+          <div
+            className={styles.dewIndicator}
+            style={{ backgroundColor: getDewPointColor(dewWarning.level) }}
+          />
+          <div className={styles.dewContent}>
+            <span
+              className={styles.dewMessage}
+              style={{ color: getDewPointColor(dewWarning.level) }}
+            >
+              {dewWarning.message}
             </span>
-          )}
+            {dewWarning.spread !== null && (
+              <span className={styles.dewSpread}>
+                ({dewWarning.spread.toFixed(1)}°C)
+              </span>
+            )}
+          </div>
         </div>
+        {dewSpreadData.length >= 2 && (
+          <div className={styles.dewSparkline}>
+            <Sparkline
+              data={dewSpreadData}
+              width={160}
+              height={24}
+              color={getDewPointColor(dewWarning.level)}
+              historyHours={historyHours}
+            />
+          </div>
+        )}
       </div>
 
       {/* Compass fills remaining space */}
