@@ -27,6 +27,7 @@ import json
 import time
 import threading
 import logging
+import hashlib
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -75,7 +76,7 @@ CONFIG = {
     "allsky_image_url": os.getenv("ALLSKY_IMAGE_URL", ""),  # Fallback URL if file not found
     "push_interval": int(os.getenv("PUSH_INTERVAL", "60")),
     "bom_satellite_enabled": os.getenv("BOM_SATELLITE_ENABLED", "true").lower() == "true",
-    "bom_satellite_interval": int(os.getenv("BOM_SATELLITE_INTERVAL", "600")),
+    "bom_satellite_interval": int(os.getenv("BOM_SATELLITE_INTERVAL", "1800")),  # 30 minutes default
     "bom_radar_station": os.getenv("BOM_RADAR_STATION", ""),  # e.g., "71" for Sydney
     "log_level": os.getenv("LOG_LEVEL", "INFO"),
     # Multi-device configurations (up to 3 of each type)
@@ -1173,26 +1174,74 @@ def get_bom_timestamp(minutes_ago: int = 30) -> str:
 
 
 def fetch_bom_satellite(product: dict) -> Optional[bytes]:
-    """Fetch a BOM satellite image via FTP with fallback timestamps using curl."""
+    """
+    Fetch latest BOM satellite image by querying FTP directory listing once.
+
+    This optimized approach:
+    1. Lists the FTP directory once (instead of trying 12 timestamp URLs)
+    2. Finds the latest matching file for this product
+    3. Fetches that specific file
+
+    This reduces FTP requests from 12 per product to 2 per product (list + fetch).
+    """
     import subprocess
+    import re
 
-    for minutes_ago in range(30, 150, 10):
-        timestamp = get_bom_timestamp(minutes_ago)
-        url = f"{BOM_SATELLITE_FTP}/{product['prefix']}.{timestamp}{product['suffix']}"
+    ftp_dir = f"{BOM_SATELLITE_FTP}/"
+    prefix = product['prefix']
+    suffix = product['suffix']
 
-        try:
-            result = subprocess.run(
-                ["curl", "-s", "--connect-timeout", "10", "-o", "-", url],
-                capture_output=True,
-                timeout=30
-            )
-            if result.returncode == 0 and len(result.stdout) > 1000:
-                logger.debug(f"BOM {product['id']}: fetched from {timestamp}")
-                return result.stdout
-        except Exception:
-            continue
+    try:
+        # Get directory listing
+        result = subprocess.run(
+            ["curl", "-s", "--connect-timeout", "10", ftp_dir],
+            capture_output=True,
+            timeout=15
+        )
 
-    logger.warning(f"BOM {product['id']}: no image available")
+        if result.returncode != 0:
+            logger.warning(f"BOM {product['id']}: FTP listing failed")
+            return None
+
+        listing = result.stdout.decode("utf-8", errors="ignore")
+
+        # Parse listing for files matching this product
+        # FTP listing format varies, but filename is typically last item on each line
+        # Pattern: prefix.YYYYMMDDHHMM.suffix (e.g., IDE00135.202601210300.jpg)
+        pattern = re.compile(
+            rf"({re.escape(prefix)}\.(\d{{12}}){re.escape(suffix)})"
+        )
+
+        matches = pattern.findall(listing)
+
+        if not matches:
+            logger.warning(f"BOM {product['id']}: no files found in listing")
+            return None
+
+        # Sort by timestamp (second group) and get the latest
+        # matches is list of tuples: (full_filename, timestamp)
+        matches.sort(key=lambda x: x[1], reverse=True)
+        latest_file = matches[0][0]
+
+        # Fetch the latest file
+        url = f"{ftp_dir}{latest_file}"
+        result = subprocess.run(
+            ["curl", "-s", "--max-time", "30", "-o", "-", url],
+            capture_output=True,
+            timeout=45
+        )
+
+        if result.returncode == 0 and len(result.stdout) > 1000:
+            logger.debug(f"BOM {product['id']}: fetched {latest_file}")
+            return result.stdout
+        else:
+            logger.warning(f"BOM {product['id']}: fetch failed for {latest_file}")
+
+    except subprocess.TimeoutExpired:
+        logger.warning(f"BOM {product['id']}: timeout")
+    except Exception as e:
+        logger.warning(f"BOM {product['id']}: error - {e}")
+
     return None
 
 
@@ -1219,10 +1268,17 @@ def fetch_bom_radar(product: dict) -> Optional[bytes]:
 
 
 def push_bom_imagery():
-    """Fetch BOM satellite and radar images and push to remote API."""
+    """
+    Fetch BOM satellite and radar images and push to remote API.
+
+    Optimizations implemented:
+    1. Uses directory listing to find latest file (instead of 12 timestamp attempts)
+    2. Computes MD5 hash of each image and skips upload if unchanged
+    3. Default interval increased to 30 minutes (configurable via BOM_SATELLITE_INTERVAL)
+    """
     api_url = CONFIG["remote_api"]
     api_key = CONFIG["api_key"]
-    interval = CONFIG.get("bom_satellite_interval", 600)
+    interval = CONFIG.get("bom_satellite_interval", 1800)  # Default 30 minutes
 
     if not api_key:
         logger.warning("No API key, BOM imagery push disabled")
@@ -1232,18 +1288,35 @@ def push_bom_imagery():
         logger.info("BOM imagery fetching disabled")
         return
 
+    # Track image hashes to detect changes
+    image_hashes: Dict[str, str] = {}
+
     radar_products = get_radar_products()
     logger.info(f"Starting BOM imagery fetcher, interval={interval}s")
     logger.info(f"  Satellite products: {len(BOM_SATELLITE_PRODUCTS)}")
     logger.info(f"  Radar products: {len(radar_products)} (station: {CONFIG.get('bom_radar_station', 'none')})")
+    logger.info(f"  Change detection: enabled (skips duplicate uploads)")
 
     while True:
+        uploaded_count = 0
+        skipped_count = 0
+
         # Fetch satellite images
         for product in BOM_SATELLITE_PRODUCTS:
             try:
                 image_data = fetch_bom_satellite(product)
 
                 if image_data:
+                    # Compute hash to detect changes
+                    image_hash = hashlib.md5(image_data).hexdigest()
+
+                    # Skip if unchanged
+                    if image_hashes.get(product["id"]) == image_hash:
+                        logger.debug(f"BOM {product['id']}: unchanged, skipping upload")
+                        skipped_count += 1
+                        continue
+
+                    # Upload changed image
                     files = {
                         "image": (f"{product['id']}.jpg", image_data, "image/jpeg")
                     }
@@ -1256,7 +1329,10 @@ def push_bom_imagery():
                     )
 
                     if response.ok:
-                        logger.info(f"BOM {product['id']}: pushed successfully")
+                        # Update hash only on successful upload
+                        image_hashes[product["id"]] = image_hash
+                        uploaded_count += 1
+                        logger.info(f"BOM {product['id']}: pushed successfully (new image)")
                     else:
                         logger.warning(f"BOM {product['id']}: push failed {response.status_code}")
 
@@ -1271,6 +1347,16 @@ def push_bom_imagery():
                 image_data = fetch_bom_radar(product)
 
                 if image_data:
+                    # Compute hash to detect changes
+                    image_hash = hashlib.md5(image_data).hexdigest()
+
+                    # Skip if unchanged
+                    if image_hashes.get(product["id"]) == image_hash:
+                        logger.debug(f"BOM {product['id']}: unchanged, skipping upload")
+                        skipped_count += 1
+                        continue
+
+                    # Upload changed image
                     files = {
                         "image": (f"{product['id']}.gif", image_data, "image/gif")
                     }
@@ -1283,7 +1369,10 @@ def push_bom_imagery():
                     )
 
                     if response.ok:
-                        logger.info(f"BOM {product['id']}: pushed successfully")
+                        # Update hash only on successful upload
+                        image_hashes[product["id"]] = image_hash
+                        uploaded_count += 1
+                        logger.info(f"BOM {product['id']}: pushed successfully (new image)")
                     else:
                         logger.warning(f"BOM {product['id']}: push failed {response.status_code}")
 
@@ -1292,6 +1381,7 @@ def push_bom_imagery():
 
             time.sleep(2)
 
+        logger.info(f"BOM cycle complete: {uploaded_count} uploaded, {skipped_count} unchanged")
         time.sleep(interval)
 
 
