@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { spawn } from "child_process";
 
+// Cache for 5 minutes at edge - BOM images update every 10-30 minutes
+// This enables ISR caching and reduces origin transfers significantly
+export const revalidate = 300;
+
 // Initialize Supabase client (may not be configured)
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY;

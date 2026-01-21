@@ -6,9 +6,9 @@ import {
 import { getTelemetryHealth, getAggregatedConditions } from "@/lib/telemetryKV";
 import { WeatherData, HistoricalReading, WeatherHistory, ApiResponse, CloudCondition, RainCondition, WindCondition, DayCondition, FailedInstrument, InstrumentReading } from "@/types/weather";
 
-// Cache response for 30 seconds to reduce origin transfers
-// Data is pushed every 60 seconds from collector, so 30s cache is a good balance
-export const revalidate = 30;
+// Cache response for 60 seconds to reduce origin transfers
+// Data is pushed every 60 seconds from collector, so 60s cache matches the update frequency
+export const revalidate = 60;
 
 // Valid history window options in hours
 const VALID_HISTORY_HOURS = [1, 4, 8, 12, 24, 48];
