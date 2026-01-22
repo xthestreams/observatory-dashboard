@@ -43,10 +43,10 @@ CREATE INDEX IF NOT EXISTS idx_readings_weather_time
 -- PART 2: INDEXES FOR LEGACY WEATHER_READINGS TABLE
 -- ─────────────────────────────────────────────────────────────────────────────
 
--- Index for fast deletion of old records
-CREATE INDEX IF NOT EXISTS idx_weather_readings_cleanup
-  ON weather_readings(created_at)
-  WHERE created_at < NOW() - INTERVAL '31 days';
+-- Index for time-based queries and cleanup operations on legacy table
+-- Note: Can't use partial index with NOW() as it's not immutable
+CREATE INDEX IF NOT EXISTS idx_weather_readings_time
+  ON weather_readings(created_at DESC);
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- PART 3: MATERIALIZED VIEW FOR CURRENT SITE CONDITIONS
