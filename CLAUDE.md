@@ -190,3 +190,59 @@ Check the KV rate limiting - writes are limited to 120s intervals. Debug with `/
 
 ### Stale data
 The collector sends heartbeats every 60s. If heartbeat age > 5 minutes, status shows as "stale".
+
+## Rollback Procedures
+
+### Last Known Good Commits
+
+If recent changes break production, you can quickly rollback:
+
+| Date | Commit | Description |
+|------|--------|-------------|
+| 2026-01-22 | `7b43666` | Before medium/high priority optimizations (Zod, logging, indexes) |
+| 2026-01-22 | `a5051ad` | Before ISR caching changes |
+| 2026-01-21 | `4ac3b0b` | Stable with history controls and bandwidth caching |
+
+### Quick Rollback Commands
+
+```bash
+# View recent commits
+git log --oneline -10
+
+# Rollback to a specific commit (creates new commit)
+git revert --no-commit HEAD~N..HEAD  # Revert last N commits
+git commit -m "Revert: rollback to stable version"
+git push origin main
+
+# Or hard reset (destructive - use with caution)
+git reset --hard 7b43666
+git push --force origin main
+```
+
+### Database Rollback
+
+If the SQL migration `003_performance_indexes.sql` causes issues:
+
+```sql
+-- Remove indexes (safe - won't affect data)
+DROP INDEX IF EXISTS idx_instrument_readings_composite;
+DROP INDEX IF EXISTS idx_readings_outliers;
+DROP INDEX IF EXISTS idx_instrument_last_reading;
+DROP INDEX IF EXISTS idx_readings_sky_quality_time;
+DROP INDEX IF EXISTS idx_readings_weather_time;
+DROP INDEX IF EXISTS idx_weather_readings_time;
+
+-- Remove materialized views (safe - they're pre-computed caches)
+DROP MATERIALIZED VIEW IF EXISTS site_conditions_current;
+DROP MATERIALIZED VIEW IF EXISTS sqm_history_24h;
+
+-- Remove refresh functions
+DROP FUNCTION IF EXISTS refresh_site_conditions();
+DROP FUNCTION IF EXISTS refresh_sqm_history();
+```
+
+### Vercel Deployment Rollback
+
+1. Go to Vercel Dashboard → Deployments
+2. Find a working deployment
+3. Click "..." → "Promote to Production"
