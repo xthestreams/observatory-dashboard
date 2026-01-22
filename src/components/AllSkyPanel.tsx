@@ -1,15 +1,64 @@
 "use client";
 
+import { useEffect, useRef, useCallback } from "react";
 import styles from "./AllSkyPanel.module.css";
 
 interface AllSkyPanelProps {
   imageUrl: string;
+  onNewImage?: () => void;
+  pollInterval?: number; // ms between status checks, default 10s
 }
 
-export default function AllSkyPanel({ imageUrl }: AllSkyPanelProps) {
+export default function AllSkyPanel({
+  imageUrl,
+  onNewImage,
+  pollInterval = 10000,
+}: AllSkyPanelProps) {
+  const lastUploadRef = useRef<string | null>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+
   const handleClick = () => {
     window.open("/allsky", "_blank", "noopener,noreferrer");
   };
+
+  // Poll for new images
+  const checkForNewImage = useCallback(async () => {
+    try {
+      const res = await fetch("/api/allsky/status");
+      if (!res.ok) return;
+
+      const data = await res.json();
+      const newUpload = data.lastUpload;
+
+      if (newUpload && lastUploadRef.current && newUpload !== lastUploadRef.current) {
+        // New image detected!
+        lastUploadRef.current = newUpload;
+
+        // Force reload the image by adding cache-busting timestamp
+        if (imgRef.current) {
+          const baseUrl = imageUrl.split("?")[0];
+          imgRef.current.src = `${baseUrl}?t=${Date.now()}`;
+        }
+
+        // Notify parent to refresh dashboard data
+        onNewImage?.();
+      } else if (newUpload && !lastUploadRef.current) {
+        // First poll - just store the timestamp
+        lastUploadRef.current = newUpload;
+      }
+    } catch (err) {
+      // Silent fail - polling will retry
+    }
+  }, [imageUrl, onNewImage]);
+
+  useEffect(() => {
+    // Initial check
+    checkForNewImage();
+
+    // Set up polling
+    const interval = setInterval(checkForNewImage, pollInterval);
+    return () => clearInterval(interval);
+  }, [checkForNewImage, pollInterval]);
 
   return (
     <div className={styles.container}>
@@ -25,6 +74,7 @@ export default function AllSkyPanel({ imageUrl }: AllSkyPanelProps) {
         }}
       >
         <img
+          ref={imgRef}
           src={imageUrl}
           alt="All-sky view"
           className={styles.image}

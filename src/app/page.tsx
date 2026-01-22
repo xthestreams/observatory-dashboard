@@ -38,7 +38,7 @@ export default function Dashboard() {
   const [sqmHistory, setSqmHistory] = useState<HistoricalReading[]>([]);
   const [sqmHistoryByInstrument, setSqmHistoryByInstrument] = useState<Record<string, HistoricalReading[]>>({});
   const [weatherHistory, setWeatherHistory] = useState<WeatherHistory[]>([]);
-  const [allskyUrl, setAllskyUrl] = useState<string>("/api/allsky/latest.jpg");
+  const [allskyUrl] = useState<string>("/api/allsky/latest.jpg");
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -77,9 +77,13 @@ export default function Dashboard() {
     } finally {
       setIsLoading(false);
     }
-    // Update allsky image URL (remove aggressive cache busting)
-    setAllskyUrl(`/api/allsky/latest.jpg`);
   }, [historyHours]);
+
+  // Handler for when a new AllSky image is detected
+  const handleNewAllSkyImage = useCallback(() => {
+    // Refresh all dashboard data when new image arrives
+    fetchData();
+  }, [fetchData]);
 
   useEffect(() => {
     fetchData();
@@ -215,7 +219,7 @@ export default function Dashboard() {
         {/* AllSky Camera */}
         <section className={styles.panel}>
           <h2 className={styles.panelTitle}>All-Sky Camera</h2>
-          <AllSkyPanel imageUrl={allskyUrl} />
+          <AllSkyPanel imageUrl={allskyUrl} onNewImage={handleNewAllSkyImage} />
         </section>
 
         {/* Row 2: Sky Conditions (Measurements) - Full Width */}

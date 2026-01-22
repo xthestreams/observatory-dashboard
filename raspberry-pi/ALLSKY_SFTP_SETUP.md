@@ -35,25 +35,62 @@ Instead of the collector pulling images from the Allsky camera via HTTP, we conf
 
 ## Setup Instructions
 
-### Step 1: Configure the Collector Pi
+### Step 1: Configure the Collector Pi (Manual Setup)
 
-SSH into your collector Pi and run the setup script:
+SSH into your collector Pi and run the following commands:
 
 ```bash
-# Download and run the setup script
-cd ~/observatory-collector
-sudo ./setup-allsky-sftp.sh
+# Create the dedicated user with no shell and home in /var/lib/allsky-uploads
+sudo useradd -r -s /usr/sbin/nologin -d /var/lib/allsky-uploads -m allsky-upload
+
+# Create upload directories
+sudo mkdir -p /var/lib/allsky-uploads/{images,videos,keograms,startrails,allsky}
+sudo chown -R allsky-upload:allsky-upload /var/lib/allsky-uploads
+sudo chmod 755 /var/lib/allsky-uploads
+
+# Create .ssh directory for the user
+sudo mkdir -p /var/lib/allsky-uploads/.ssh
+sudo chmod 700 /var/lib/allsky-uploads/.ssh
+sudo touch /var/lib/allsky-uploads/.ssh/authorized_keys
+sudo chmod 600 /var/lib/allsky-uploads/.ssh/authorized_keys
+sudo chown -R allsky-upload:allsky-upload /var/lib/allsky-uploads/.ssh
+
+# Set correct ownership for chroot (root must own the chroot root)
+sudo chown root:root /var/lib/allsky-uploads
+sudo chmod 755 /var/lib/allsky-uploads
+
+# Ensure subdirectories are writable by the user
+sudo chown allsky-upload:allsky-upload /var/lib/allsky-uploads/{images,videos,keograms,startrails,allsky}
+sudo chmod 755 /var/lib/allsky-uploads/{images,videos,keograms,startrails,allsky}
 ```
 
-This creates:
-- User `allsky-upload` (restricted, no shell)
-- Directory `/var/lib/allsky-uploads/` with subdirectories:
-  - `images/` - For current image (image.jpg)
-  - `videos/` - For timelapse videos
-  - `keograms/` - For keogram images
-  - `startrails/` - For startrail images
+### Step 2: Configure SSH for SFTP-only Access
 
-### Step 2: Generate SSH Keys on Allsky Pi
+Add the following to the **end** of `/etc/ssh/sshd_config`:
+
+```bash
+sudo nano /etc/ssh/sshd_config
+```
+
+Add at the bottom:
+
+```
+# Allsky SFTP Upload Configuration
+Match User allsky-upload
+    ChrootDirectory /var/lib/allsky-uploads
+    ForceCommand internal-sftp
+    AllowTcpForwarding no
+    X11Forwarding no
+    PasswordAuthentication no
+```
+
+Restart SSH:
+
+```bash
+sudo systemctl restart sshd
+```
+
+### Step 3: Generate SSH Keys on Allsky Pi
 
 SSH into your Allsky Pi and generate a dedicated key pair:
 
@@ -65,7 +102,7 @@ ssh-keygen -t ed25519 -f ~/.ssh/allsky_upload -N '' -C 'allsky-upload'
 cat ~/.ssh/allsky_upload.pub
 ```
 
-### Step 3: Add Public Key to Collector
+### Step 4: Add Public Key to Collector
 
 Copy the public key to the collector's authorized_keys:
 
@@ -79,9 +116,12 @@ cat ~/.ssh/allsky_upload.pub | ssh YOUR_USER@COLLECTOR_IP \
 # 2. SSH to collector as your regular user
 # 3. Run: sudo nano /var/lib/allsky-uploads/.ssh/authorized_keys
 # 4. Paste the key and save
+
+# Ensure correct ownership after adding the key
+ssh YOUR_USER@COLLECTOR_IP 'sudo chown allsky-upload:allsky-upload /var/lib/allsky-uploads/.ssh/authorized_keys'
 ```
 
-### Step 4: Test the SFTP Connection
+### Step 5: Test the SFTP Connection
 
 From your Allsky Pi, test the connection:
 
@@ -97,12 +137,38 @@ sftp -i ~/.ssh/allsky_upload allsky-upload@COLLECTOR_IP
 sftp> ls
 sftp> cd images
 sftp> put /tmp/test.txt
-sftp> exit
+sftp> ls
+sftp> rm test.txt
+sftp> quit
 ```
 
 If it works, you'll be in a restricted environment with only the upload directories visible.
 
-### Step 5: Configure Allsky Uploads
+### Step 6: Configure lftp for SSH Key Authentication
+
+Allsky uses `lftp` for SFTP uploads. Unlike the `sftp` command, lftp doesn't automatically use SSH keys from `~/.ssh/`. You must configure it explicitly.
+
+**Create the lftp configuration file:**
+
+```bash
+mkdir -p ~/.lftp
+nano ~/.lftp/rc
+```
+
+Add this line:
+```
+set sftp:connect-program "ssh -a -x -i ~/.ssh/allsky_upload"
+```
+
+**Test lftp with the key:**
+
+```bash
+lftp -e "ls; quit" sftp://allsky-upload@COLLECTOR_IP
+```
+
+You should see the upload directories (images, videos, etc.) without being prompted for a password.
+
+### Step 7: Configure Allsky Uploads
 
 Edit your Allsky configuration to use SFTP:
 
@@ -111,11 +177,11 @@ Edit your Allsky configuration to use SFTP:
 1. Go to Allsky Web Interface → Settings
 2. Navigate to the "Uploads" section
 3. Configure:
-   - **Protocol**: `scp` or `sftp`
-   - **Server**: `COLLECTOR_IP` (e.g., `192.168.10.82`)
+   - **Protocol**: `sftp`
+   - **Server**: `COLLECTOR_IP` (e.g., `192.168.1.81`)
    - **Username**: `allsky-upload`
    - **Remote Directory**: `/images` (the chroot makes this relative)
-   - **SSH Key**: `/home/pi/.ssh/allsky_upload` (private key path)
+   - **Password**: Leave empty (key-based auth via lftp config)
 
 #### Option B: Using ftp-settings.sh
 
@@ -133,7 +199,7 @@ Set these values:
 PROTOCOL="sftp"
 
 # Server address (collector Pi IP)
-REMOTE_HOST="192.168.10.82"
+REMOTE_HOST="192.168.1.81"
 
 # Username
 REMOTE_USER="allsky-upload"
@@ -157,13 +223,13 @@ Edit `~/allsky/config/config.sh`:
 ```bash
 # Upload settings
 UPLOAD_PROTOCOL="sftp"
-UPLOAD_SERVER="192.168.10.82"
+UPLOAD_SERVER="192.168.1.81"
 UPLOAD_USER="allsky-upload"
 UPLOAD_SSH_KEY="/home/pi/.ssh/allsky_upload"
 UPLOAD_IMAGE_DIR="/images"
 ```
 
-### Step 6: Update Collector Configuration
+### Step 8: Update Collector Configuration
 
 Update the collector's `.env` to read from the SFTP upload directory:
 
@@ -190,7 +256,7 @@ Restart the collector:
 sudo systemctl restart observatory-collector
 ```
 
-### Step 7: Test End-to-End
+### Step 9: Test End-to-End
 
 1. **Trigger an Allsky upload** (or wait for the next automatic one)
 2. **Check the collector logs**:
@@ -218,27 +284,42 @@ ssh: connect to host X.X.X.X port 22: Connection refused
 Permission denied (publickey).
 ```
 
-- Verify the public key was added correctly:
-  ```bash
-  sudo cat /var/lib/allsky-uploads/.ssh/authorized_keys
-  ```
-- Check key permissions:
-  ```bash
-  sudo ls -la /var/lib/allsky-uploads/.ssh/
-  # Should show:
-  # drwx------ allsky-upload allsky-upload .ssh
-  # -rw------- allsky-upload allsky-upload authorized_keys
-  ```
-- Ensure you're using the correct private key:
-  ```bash
-  sftp -i ~/.ssh/allsky_upload allsky-upload@COLLECTOR_IP
-  ```
+**Most common cause**: The user's home directory doesn't match where the authorized_keys file is stored.
+
+1. **Verify the user's home directory**:
+   ```bash
+   getent passwd allsky-upload
+   # Should show: allsky-upload:x:...:...:/var/lib/allsky-uploads:/usr/sbin/nologin
+   ```
+
+2. **If home directory is wrong (e.g., /home/allsky-upload), fix it**:
+   ```bash
+   sudo usermod -d /var/lib/allsky-uploads allsky-upload
+   ```
+
+3. **Verify the public key was added correctly**:
+   ```bash
+   sudo cat /var/lib/allsky-uploads/.ssh/authorized_keys
+   ```
+
+4. **Check key permissions**:
+   ```bash
+   sudo ls -la /var/lib/allsky-uploads/.ssh/
+   # Should show:
+   # drwx------ allsky-upload allsky-upload .ssh
+   # -rw------- allsky-upload allsky-upload authorized_keys
+   ```
+
+5. **Ensure you're using the correct private key**:
+   ```bash
+   sftp -i ~/.ssh/allsky_upload allsky-upload@COLLECTOR_IP
+   ```
 
 ### Upload Works but Collector Doesn't See Files
 
 - Check the file path in collector's `.env`:
   ```bash
-  grep ALLSKY /path/to/.env
+  grep ALLSKY ~/observatory-collector/.env
   ```
 - Verify files are being uploaded:
   ```bash
@@ -262,6 +343,14 @@ Check Allsky logs:
 
 ```bash
 tail -f ~/allsky/log/allsky.log | grep -i upload
+```
+
+### Verbose SFTP Debugging
+
+For more detailed connection debugging:
+
+```bash
+sftp -vvv -i ~/.ssh/allsky_upload allsky-upload@COLLECTOR_IP
 ```
 
 ---
@@ -321,8 +410,29 @@ To rotate the SSH key (recommended annually):
 | Item | Value |
 |------|-------|
 | Collector user | `allsky-upload` |
-| Upload directory | `/var/lib/allsky-uploads/` |
+| User home directory | `/var/lib/allsky-uploads` |
+| Upload directory (chroot root) | `/var/lib/allsky-uploads/` |
 | Images subdirectory | `/var/lib/allsky-uploads/images/` |
 | SSH key (Allsky side) | `~/.ssh/allsky_upload` |
+| lftp config (Allsky side) | `~/.lftp/rc` |
 | Authorized keys (Collector) | `/var/lib/allsky-uploads/.ssh/authorized_keys` |
 | SSH config | `/etc/ssh/sshd_config` |
+
+---
+
+## Complete Setup Checklist
+
+- [ ] Created `allsky-upload` user with home `/var/lib/allsky-uploads`
+- [ ] Created upload directories (images, videos, keograms, startrails, allsky)
+- [ ] Set correct ownership: root owns chroot root, user owns subdirectories
+- [ ] Created `.ssh/authorized_keys` with correct permissions (700/600)
+- [ ] Added SSH config for SFTP-only access
+- [ ] Restarted sshd
+- [ ] Generated SSH key on Allsky Pi
+- [ ] Added public key to collector's authorized_keys
+- [ ] Tested SFTP connection from Allsky Pi (`sftp -i`)
+- [ ] Created `~/.lftp/rc` with SSH key configuration
+- [ ] Tested lftp connection from Allsky Pi
+- [ ] Configured Allsky upload settings
+- [ ] Updated collector `.env` with new image path
+- [ ] Verified end-to-end uploads working

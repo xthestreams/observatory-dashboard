@@ -1,7 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase";
+import { Redis } from "@upstash/redis";
 
 const BUCKET_NAME = "allsky-images";
+const ALLSKY_TIMESTAMP_KEY = "allsky:last_upload";
+
+// Lazy-initialized Redis client
+let _redis: Redis | null = null;
+
+function getRedis(): Redis | null {
+  if (!_redis) {
+    const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+    const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+
+    if (!url || !token) {
+      return null;
+    }
+
+    _redis = new Redis({ url, token });
+  }
+  return _redis;
+}
 
 export async function POST(request: NextRequest) {
   // Verify API key from Raspberry Pi
@@ -52,6 +71,17 @@ export async function POST(request: NextRequest) {
         { error: "Failed to upload image" },
         { status: 500 }
       );
+    }
+
+    // Store upload timestamp in Redis for dashboard polling
+    try {
+      const redis = getRedis();
+      if (redis) {
+        await redis.set(ALLSKY_TIMESTAMP_KEY, timestamp, { ex: 3600 }); // 1 hour TTL
+      }
+    } catch (redisError) {
+      // Non-fatal: log but don't fail the upload
+      console.warn("Failed to update AllSky timestamp in Redis:", redisError);
     }
 
     return NextResponse.json({ success: true, timestamp });
