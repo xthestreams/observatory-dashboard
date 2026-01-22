@@ -75,8 +75,8 @@ export const IngestPayloadSchema = z.object({
   sky_temp: z.number().min(-100).max(50).nullish().transform(nullToUndefined),
   ambient_temp: z.number().min(-50).max(60).nullish().transform(nullToUndefined),
 
-  // SQM
-  sky_quality: z.number().min(10).max(25).nullish().transform(nullToUndefined),
+  // SQM - min 0 to allow daytime readings when sensor is saturated
+  sky_quality: z.number().min(0).max(25).nullish().transform(nullToUndefined),
   sqm_temperature: z.number().min(-50).max(60).nullish().transform(nullToUndefined),
 
   // Condition classifications - accept string for flexibility
