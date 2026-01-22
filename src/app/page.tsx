@@ -25,6 +25,8 @@ import InstrumentAlert from "@/components/InstrumentAlert";
 import InstrumentDetailModal from "@/components/InstrumentDetailModal";
 import ForecastPanel from "@/components/ForecastPanel";
 import AllSkyPanel from "@/components/AllSkyPanel";
+import { ErrorBoundary, DashboardErrorFallback } from "@/components/ErrorBoundary";
+import { DashboardSkeleton } from "@/components/Skeleton";
 import {
   getWindDirection,
 } from "@/lib/weatherHelpers";
@@ -129,15 +131,11 @@ export default function Dashboard() {
   };
 
   if (isLoading) {
-    return (
-      <div className={styles.loadingScreen}>
-        <div className={styles.loader}></div>
-        <p>Loading telemetry...</p>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   return (
+    <ErrorBoundary fallback={<DashboardErrorFallback />}>
     <div className={styles.dashboard}>
       {/* Instrument Alert Banner */}
       <InstrumentAlert
@@ -357,5 +355,6 @@ export default function Dashboard() {
         siteAverage={selectedMetric ? getSiteAverageForMetric(selectedMetric) : null}
       />
     </div>
+    </ErrorBoundary>
   );
 }

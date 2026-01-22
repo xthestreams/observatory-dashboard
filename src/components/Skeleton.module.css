@@ -1,0 +1,173 @@
+/* Skeleton loading animation styles */
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.05) 25%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(255, 255, 255, 0.05) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Conditions panel skeleton */
+.conditionsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  padding: 10px;
+}
+
+.conditionItem {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 6px;
+}
+
+.compassPlaceholder {
+  grid-column: span 2;
+  display: flex;
+  justify-content: center;
+  padding: 10px;
+}
+
+/* SQM panel skeleton */
+.sqmContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  padding: 10px;
+}
+
+.sqmGauge {
+  display: flex;
+  justify-content: center;
+  padding: 10px;
+}
+
+.sqmGraph {
+  padding: 5px;
+}
+
+/* Weather stats skeleton */
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+  padding: 10px;
+}
+
+.statItem {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 6px;
+}
+
+/* Forecast skeleton */
+.forecastContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  padding: 10px;
+}
+
+.forecastHeader {
+  padding: 5px 0;
+}
+
+.forecastDays {
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.forecastDay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 6px;
+  flex: 1;
+}
+
+/* Image placeholder */
+.imagePlaceholder {
+  width: 100%;
+  aspect-ratio: 1;
+  min-height: 150px;
+}
+
+/* Panel skeleton */
+.panel {
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 8px;
+  padding: 15px;
+}
+
+.panelTitle {
+  margin-bottom: 15px;
+}
+
+.panelContent {
+  min-height: 100px;
+}
+
+/* Full dashboard skeleton */
+.dashboardSkeleton {
+  padding: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.headerSkeleton {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 0;
+  margin-bottom: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.headerRight {
+  display: flex;
+  gap: 15px;
+}
+
+.gridSkeleton {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .statsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .forecastDays {
+    flex-wrap: wrap;
+  }
+
+  .forecastDay {
+    min-width: 60px;
+  }
+}

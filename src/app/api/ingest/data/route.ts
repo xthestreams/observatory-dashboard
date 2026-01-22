@@ -1,26 +1,49 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { createServiceClient } from "@/lib/supabase";
 import { getOrCreateInstrument } from "@/lib/instruments";
-import { IngestPayload } from "@/types/weather";
+import { createLogger } from "@/lib/logger";
+import { validateIngestKey } from "@/lib/api-auth";
+import { IngestPayloadSchema, formatZodError } from "@/lib/validation";
+import {
+  BadRequestError,
+  UnauthorizedError,
+  errorResponse,
+  generateRequestId,
+} from "@/lib/api-errors";
+
+const logger = createLogger("api/ingest/data");
 
 export async function POST(request: NextRequest) {
+  const requestId = generateRequestId();
+
   // Verify API key from Raspberry Pi
   const authHeader = request.headers.get("Authorization");
-  const expectedKey = process.env.INGEST_API_KEY;
 
-  if (!authHeader || authHeader !== `Bearer ${expectedKey}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!validateIngestKey(authHeader)) {
+    logger.warn("Unauthorized ingest attempt", { requestId });
+    return errorResponse(new UnauthorizedError(), requestId);
   }
 
   try {
-    const supabase = createServiceClient();
-    const data: IngestPayload = await request.json();
-    const timestamp = new Date().toISOString();
+    const rawData = await request.json();
 
-    // Validate payload
-    if (typeof data !== "object" || data === null) {
-      return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+    // Validate payload with Zod
+    const parseResult = IngestPayloadSchema.safeParse(rawData);
+    if (!parseResult.success) {
+      logger.warn("Invalid ingest payload", {
+        requestId,
+        errors: parseResult.error.issues.length,
+      });
+      return errorResponse(
+        new BadRequestError("Validation error", formatZodError(parseResult.error)),
+        requestId
+      );
     }
+
+    const data = parseResult.data;
+    const supabase = createServiceClient();
+    const timestamp = new Date().toISOString();
 
     // Get instrument code (default if not provided for backward compatibility)
     const instrumentCode = data.instrument_code || "default";
@@ -57,7 +80,10 @@ export async function POST(request: NextRequest) {
       .insert(readingRecord);
 
     if (readingError) {
-      console.error("Error inserting instrument reading:", readingError);
+      logger.error("Error inserting instrument reading", readingError, {
+        requestId,
+        instrumentCode,
+      });
       return NextResponse.json(
         { error: "Failed to insert instrument reading" },
         { status: 500 }
@@ -65,7 +91,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Update the instrument's last_reading_at timestamp
-    // Using .select() to ensure we get confirmation the update worked
     const { data: updateResult, error: updateError } = await supabase
       .from("instruments")
       .update({ last_reading_at: timestamp, updated_at: timestamp })
@@ -73,16 +98,20 @@ export async function POST(request: NextRequest) {
       .select("id, code, last_reading_at");
 
     if (updateError) {
-      console.error(`Error updating instrument ${instrumentCode} (${instrumentId}) last_reading_at:`, updateError);
-      // Don't fail the request - the reading was stored successfully
+      logger.error("Error updating instrument last_reading_at", updateError, {
+        requestId,
+        instrumentCode,
+        instrumentId,
+      });
     } else if (!updateResult || updateResult.length === 0) {
-      console.error(`No rows updated for instrument ${instrumentCode} (${instrumentId}) - ID may not exist`);
-    } else {
-      console.log(`Updated last_reading_at for ${instrumentCode}: ${JSON.stringify(updateResult[0])}`);
+      logger.warn("No rows updated for instrument", {
+        requestId,
+        instrumentCode,
+        instrumentId,
+      });
     }
 
     // BACKWARD COMPATIBILITY: Also update legacy tables
-    // This allows gradual migration and easy rollback
     const legacyRecord = {
       temperature: data.temperature ?? null,
       humidity: data.humidity ?? null,
@@ -110,8 +139,7 @@ export async function POST(request: NextRequest) {
       .upsert({ id: 1, ...legacyRecord });
 
     if (currentError) {
-      console.error("Error updating current conditions:", currentError);
-      // Don't fail the request - new table is the source of truth
+      logger.warn("Error updating legacy current_conditions", { requestId, error: currentError.message });
     }
 
     // Also insert into historical readings - legacy table
@@ -120,20 +148,31 @@ export async function POST(request: NextRequest) {
       .insert({ ...legacyRecord, created_at: timestamp });
 
     if (historyError) {
-      console.error("Error inserting historical reading:", historyError);
-      // Don't fail the request - new table is the source of truth
+      logger.warn("Error inserting legacy weather_readings", { requestId, error: historyError.message });
     }
+
+    logger.info("Ingest successful", {
+      requestId,
+      instrumentCode,
+      hasTemperature: data.temperature != null,
+      hasSkyQuality: data.sky_quality != null,
+    });
 
     return NextResponse.json({
       success: true,
       timestamp,
       instrument: instrumentCode,
+      requestId,
     });
   } catch (error) {
-    console.error("Ingest error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    if (error instanceof z.ZodError) {
+      return errorResponse(
+        new BadRequestError("Validation error", formatZodError(error)),
+        requestId
+      );
+    }
+
+    logger.error("Ingest error", error, { requestId });
+    return errorResponse(error, requestId);
   }
 }
