@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { spawn } from "child_process";
+import { Redis } from "@upstash/redis";
 
 // Cache for 5 minutes at edge - BOM images update every 10-30 minutes
 // This enables ISR caching and reduces origin transfers significantly
@@ -9,6 +10,32 @@ export const revalidate = 300;
 // Initialize Supabase client (may not be configured)
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+
+// Lazy-initialized Redis client for metadata tracking
+let _redis: Redis | null = null;
+
+function getRedis(): Redis | null {
+  if (_redis) return _redis;
+
+  const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+
+  if (!url || !token) return null;
+
+  _redis = new Redis({ url, token });
+  return _redis;
+}
+
+// Redis key prefix for BOM metadata
+const BOM_METADATA_PREFIX = "bom:metadata:";
+// TTL for metadata entries (1 hour)
+const METADATA_TTL_SECONDS = 60 * 60;
+
+interface BomMetadata {
+  filename: string;
+  fetchedAt: string;
+  size: number;
+}
 
 // Valid satellite product IDs
 const SATELLITE_PRODUCTS = [
@@ -97,8 +124,8 @@ function extractFilename(line: string): string | null {
   return null;
 }
 
-// Find latest file matching product ID pattern
-async function findLatestFile(productId: string): Promise<string | null> {
+// Find latest filename (just the filename, not full URL)
+async function findLatestFilename(productId: string): Promise<string | null> {
   const ftpDir = getFtpDir(productId);
   const listing = await curlText(ftpDir);
 
@@ -123,7 +150,7 @@ async function findLatestFile(productId: string): Promise<string | null> {
     // Radar files are simple: IDRxxx.gif
     const simpleFile = `${productId}.gif`;
     if (filenames.includes(simpleFile)) {
-      return `${ftpDir}${simpleFile}`;
+      return simpleFile;
     }
     // Also check for timestamped radar files
     matchingFiles = filenames.filter(f => f.startsWith(productId + "."));
@@ -139,9 +166,66 @@ async function findLatestFile(productId: string): Promise<string | null> {
 
   // Sort to get the latest (timestamps are in YYYYMMDDHHMM format)
   matchingFiles.sort();
-  const latestFile = matchingFiles[matchingFiles.length - 1];
+  return matchingFiles[matchingFiles.length - 1];
+}
 
-  return `${ftpDir}${latestFile}`;
+// Get cached metadata from Redis
+async function getCachedMetadata(productId: string): Promise<BomMetadata | null> {
+  const redis = getRedis();
+  if (!redis) return null;
+
+  try {
+    const data = await redis.get<BomMetadata>(`${BOM_METADATA_PREFIX}${productId}`);
+    return data;
+  } catch (e) {
+    console.log("Redis get metadata failed:", e);
+    return null;
+  }
+}
+
+// Save metadata to Redis
+async function saveCachedMetadata(productId: string, metadata: BomMetadata): Promise<void> {
+  const redis = getRedis();
+  if (!redis) return;
+
+  try {
+    await redis.set(`${BOM_METADATA_PREFIX}${productId}`, metadata, {
+      ex: METADATA_TTL_SECONDS,
+    });
+  } catch (e) {
+    console.log("Redis set metadata failed:", e);
+  }
+}
+
+// Upload image to Supabase Storage
+async function uploadToSupabase(
+  supabase: SupabaseClient,
+  productId: string,
+  imageData: Buffer,
+  isGif: boolean
+): Promise<boolean> {
+  try {
+    const extension = isGif ? "gif" : "jpg";
+    const contentType = isGif ? "image/gif" : "image/jpeg";
+    const filename = `bom-satellite/${productId}.${extension}`;
+
+    const { error } = await supabase.storage
+      .from("allsky-images")
+      .upload(filename, imageData, {
+        contentType,
+        upsert: true,
+      });
+
+    if (error) {
+      console.log("Supabase upload failed:", error);
+      return false;
+    }
+
+    return true;
+  } catch (e) {
+    console.log("Supabase upload error:", e);
+    return false;
+  }
 }
 
 export async function GET(
@@ -158,17 +242,36 @@ export async function GET(
   }
 
   const isRadar = isRadarProduct(productId);
+  const ftpDir = getFtpDir(productId);
 
-  // Try Supabase first if configured
-  if (supabaseUrl && supabaseKey) {
+  // Check if we have cached metadata and Supabase is configured
+  const supabase = supabaseUrl && supabaseKey
+    ? createClient(supabaseUrl, supabaseKey)
+    : null;
+
+  // Step 1: Check what's the latest file on BOM FTP (lightweight directory listing)
+  const latestFilename = await findLatestFilename(productId);
+
+  if (!latestFilename) {
+    return NextResponse.json(
+      { error: "No files found for product", productId },
+      { status: 404 }
+    );
+  }
+
+  // Step 2: Check if we already have this file cached
+  const cachedMetadata = await getCachedMetadata(productId);
+  const isNewFile = !cachedMetadata || cachedMetadata.filename !== latestFilename;
+
+  // Step 3: If file hasn't changed and we have Supabase, try to serve from cache
+  if (!isNewFile && supabase) {
     try {
-      const supabase = createClient(supabaseUrl, supabaseKey);
       const extension = isRadar ? "gif" : "jpg";
-      const filename = `bom-satellite/${productId}.${extension}`;
+      const storagePath = `bom-satellite/${productId}.${extension}`;
 
       const { data, error } = await supabase.storage
         .from("allsky-images")
-        .download(filename);
+        .download(storagePath);
 
       if (!error && data) {
         const imageBuffer = await data.arrayBuffer();
@@ -177,49 +280,49 @@ export async function GET(
           headers: {
             "Content-Type": contentType,
             "Cache-Control": "public, max-age=300",
+            "X-BOM-Source": "supabase-cache",
+            "X-BOM-Filename": latestFilename,
           },
         });
       }
     } catch (e) {
-      console.log("Supabase fetch failed, falling back to FTP:", e);
+      console.log("Supabase cache fetch failed, will re-download:", e);
     }
   }
 
-  // Fallback: fetch directly from BOM FTP
-  try {
-    const ftpUrl = await findLatestFile(productId);
+  // Step 4: Download fresh image from BOM FTP
+  const ftpUrl = `${ftpDir}${latestFilename}`;
+  const imageData = await curlBinary(ftpUrl);
 
-    if (!ftpUrl) {
-      return NextResponse.json(
-        { error: "No files found for product", productId },
-        { status: 404 }
-      );
-    }
-
-    const imageData = await curlBinary(ftpUrl);
-
-    if (imageData) {
-      // Determine content type from URL
-      const isGif = ftpUrl.endsWith(".gif");
-      const contentType = isGif ? "image/gif" : "image/jpeg";
-
-      return new NextResponse(new Uint8Array(imageData), {
-        headers: {
-          "Content-Type": contentType,
-          "Cache-Control": "public, max-age=300",
-        },
-      });
-    }
-
+  if (!imageData) {
     return NextResponse.json(
       { error: "Image not available", productId },
       { status: 404 }
     );
-  } catch (error) {
-    console.error("BOM satellite fetch error:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch satellite image" },
-      { status: 500 }
-    );
   }
+
+  // Step 5: Upload to Supabase for future requests (if configured)
+  const isGif = latestFilename.endsWith(".gif");
+  if (supabase) {
+    await uploadToSupabase(supabase, productId, imageData, isGif);
+  }
+
+  // Step 6: Update metadata in Redis
+  await saveCachedMetadata(productId, {
+    filename: latestFilename,
+    fetchedAt: new Date().toISOString(),
+    size: imageData.length,
+  });
+
+  // Step 7: Return the image
+  const contentType = isGif ? "image/gif" : "image/jpeg";
+
+  return new NextResponse(new Uint8Array(imageData), {
+    headers: {
+      "Content-Type": contentType,
+      "Cache-Control": "public, max-age=300",
+      "X-BOM-Source": "ftp-fresh",
+      "X-BOM-Filename": latestFilename,
+    },
+  });
 }
