@@ -4,10 +4,13 @@ import {
   fetchLatestInstrumentReadings,
 } from "@/lib/instruments";
 import { getTelemetryHealth, getAggregatedConditions } from "@/lib/telemetryKV";
+import { createLogger } from "@/lib/logger";
 import { WeatherData, HistoricalReading, WeatherHistory, ApiResponse, CloudCondition, RainCondition, WindCondition, DayCondition, FailedInstrument, InstrumentReading } from "@/types/weather";
 
-// Cache response for 60 seconds to reduce origin transfers
-// Data is pushed every 60 seconds from collector, so 60s cache matches the update frequency
+const logger = createLogger("api/current");
+
+// ISR cache for 60 seconds at edge
+// Combined with stale-while-revalidate headers for optimal caching
 export const revalidate = 60;
 
 // Valid history window options in hours
@@ -416,9 +419,17 @@ export async function GET(request: NextRequest) {
       instrumentCount,
     };
 
-    return NextResponse.json(response);
+    // Return with stale-while-revalidate for optimal caching
+    // - max-age=60: Browser cache for 60s
+    // - s-maxage=120: CDN cache for 2 minutes
+    // - stale-while-revalidate=300: Serve stale for 5 minutes while revalidating
+    return NextResponse.json(response, {
+      headers: {
+        "Cache-Control": "public, max-age=60, s-maxage=120, stale-while-revalidate=300",
+      },
+    });
   } catch (error) {
-    console.error("API error:", error);
+    logger.error("API error fetching current conditions", error);
 
     // Return mock data for development/demo
     return NextResponse.json({
