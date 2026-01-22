@@ -1,0 +1,84 @@
+.container {
+  border-left: 4px solid;
+  border-radius: 4px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.header {
+  margin-bottom: 12px;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.meta {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.type {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.date {
+  font-style: italic;
+}
+
+.content {
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 12px 0;
+}
+
+.content p {
+  margin: 8px 0;
+}
+
+.content p:first-child {
+  margin-top: 0;
+}
+
+.content p:last-child {
+  margin-bottom: 0;
+}
+
+.content strong {
+  font-weight: 600;
+}
+
+.content a {
+  text-decoration: underline;
+  opacity: 0.8;
+}
+
+.content a:hover {
+  opacity: 1;
+}
+
+.expiresAt {
+  font-size: 12px;
+  opacity: 0.6;
+  margin-top: 8px;
+  font-style: italic;
+}
