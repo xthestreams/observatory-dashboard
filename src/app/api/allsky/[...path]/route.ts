@@ -3,9 +3,9 @@ import { NextResponse } from "next/server";
 const BUCKET_NAME = "allsky-images";
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
 
-// Cache for 5 minutes at edge - AllSky images update every few minutes
-// Removed cache-busting timestamp to allow proper edge caching
-export const revalidate = 300;
+// Cache for 10 minutes at edge - AllSky images update every few minutes
+// Client uses versioned URLs (?v=timestamp) so stale data is avoided
+export const revalidate = 600;
 
 export async function GET() {
   if (!SUPABASE_URL) {

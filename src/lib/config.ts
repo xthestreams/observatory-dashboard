@@ -65,7 +65,8 @@ export const siteConfig = {
   // ═══════════════════════════════════════════════════════════════════════════
 
   // How often to refresh data (milliseconds)
-  refreshInterval: 30000, // 30 seconds
+  // Increased from 30s to 60s to reduce Vercel Fast Origin Transfers
+  refreshInterval: 60000, // 60 seconds
 
   // Privacy: round altitude to nearest N meters when displayed publicly
   // e.g., 1000 rounds 1165m to "~1000m"

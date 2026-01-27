@@ -3,9 +3,10 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { spawn } from "child_process";
 import { Redis } from "@upstash/redis";
 
-// Cache for 5 minutes at edge - BOM images update every 10-30 minutes
+// Cache for 30 minutes at edge - BOM images update every 10-30 minutes
 // This enables ISR caching and reduces origin transfers significantly
-export const revalidate = 300;
+// Increased from 5 min to 30 min to reduce Vercel Fast Origin Transfers
+export const revalidate = 1800;
 
 // Initialize Supabase client (may not be configured)
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -279,7 +280,7 @@ export async function GET(
         return new NextResponse(imageBuffer, {
           headers: {
             "Content-Type": contentType,
-            "Cache-Control": "public, max-age=300",
+            "Cache-Control": "public, max-age=1800, s-maxage=1800, stale-while-revalidate=3600",
             "X-BOM-Source": "supabase-cache",
             "X-BOM-Filename": latestFilename,
           },
@@ -320,7 +321,7 @@ export async function GET(
   return new NextResponse(new Uint8Array(imageData), {
     headers: {
       "Content-Type": contentType,
-      "Cache-Control": "public, max-age=300",
+      "Cache-Control": "public, max-age=1800, s-maxage=1800, stale-while-revalidate=3600",
       "X-BOM-Source": "ftp-fresh",
       "X-BOM-Filename": latestFilename,
     },

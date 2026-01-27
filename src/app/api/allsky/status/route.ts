@@ -3,8 +3,9 @@ import { Redis } from "@upstash/redis";
 
 const ALLSKY_TIMESTAMP_KEY = "allsky:last_upload";
 
-// No edge caching - we want fresh data for polling
-export const dynamic = "force-dynamic";
+// Short edge cache - 15 seconds is enough for responsive polling
+// while reducing origin transfers (polling is now 30s)
+export const revalidate = 15;
 
 // Lazy-initialized Redis client
 let _redis: Redis | null = null;
@@ -39,6 +40,10 @@ export async function GET() {
     return NextResponse.json({
       lastUpload,
       serverTime: new Date().toISOString(),
+    }, {
+      headers: {
+        "Cache-Control": "public, max-age=15, s-maxage=15, stale-while-revalidate=30",
+      },
     });
   } catch (error) {
     console.error("Error fetching AllSky status:", error);

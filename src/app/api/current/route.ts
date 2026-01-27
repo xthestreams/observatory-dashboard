@@ -9,9 +9,9 @@ import { WeatherData, HistoricalReading, WeatherHistory, ApiResponse, CloudCondi
 
 const logger = createLogger("api/current");
 
-// ISR cache for 60 seconds at edge
+// ISR cache for 5 minutes at edge (increased from 60s to reduce origin transfers)
 // Combined with stale-while-revalidate headers for optimal caching
-export const revalidate = 60;
+export const revalidate = 300;
 
 // Valid history window options in hours
 const VALID_HISTORY_HOURS = [1, 4, 8, 12, 24, 48];
@@ -32,7 +32,9 @@ export async function GET(request: NextRequest) {
 
   // Calculate limit based on history window
   // Assuming ~1 sample per minute per instrument, scale limit accordingly
-  const historyLimit = Math.min(historyHours * 60, 3000); // Cap at 3000 to prevent huge queries
+  // Cap at 1000 to reduce response size and origin transfers (was 3000)
+  // With 5-min grouping, 48h only needs 576 points max anyway
+  const historyLimit = Math.min(historyHours * 60, 1000);
   try {
     const supabase = createServiceClient();
 
@@ -421,11 +423,11 @@ export async function GET(request: NextRequest) {
 
     // Return with stale-while-revalidate for optimal caching
     // - max-age=60: Browser cache for 60s
-    // - s-maxage=120: CDN cache for 2 minutes
-    // - stale-while-revalidate=300: Serve stale for 5 minutes while revalidating
+    // - s-maxage=300: CDN cache for 5 minutes (increased from 2 min to reduce origin transfers)
+    // - stale-while-revalidate=600: Serve stale for 10 minutes while revalidating
     return NextResponse.json(response, {
       headers: {
-        "Cache-Control": "public, max-age=60, s-maxage=120, stale-while-revalidate=300",
+        "Cache-Control": "public, max-age=60, s-maxage=300, stale-while-revalidate=600",
       },
     });
   } catch (error) {
