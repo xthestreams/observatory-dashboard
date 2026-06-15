@@ -4,6 +4,7 @@ import {
   fetchLatestInstrumentReadings,
 } from "@/lib/instruments";
 import { getTelemetryHealth, getAggregatedConditions } from "@/lib/telemetryKV";
+import { excludeOutliers, calculateDewPoint, HUMIDITY_OUTLIER_DEVIATION } from "@/lib/weatherMath";
 import { createLogger } from "@/lib/logger";
 import { WeatherData, HistoricalReading, WeatherHistory, ApiResponse, CloudCondition, RainCondition, WindCondition, DayCondition, FailedInstrument, InstrumentReading } from "@/types/weather";
 
@@ -94,11 +95,20 @@ export async function GET(request: NextRequest) {
       const sky_quality = avg(readings.map(r => r.sky_quality));
       const cloud_condition = mode(readings.map(r => r.cloud_condition));
 
+      // Exclude humidity outliers (e.g. a single misbehaving sensor) before
+      // averaging, then derive dew point from the filtered humidity so the
+      // two stay consistent.
+      const humidityValues = readings.map(r => r.humidity).filter((x): x is number => x !== null);
+      const humidity = avg(excludeOutliers(humidityValues, HUMIDITY_OUTLIER_DEVIATION));
+      const dewpoint = temperature !== null && humidity !== null
+        ? calculateDewPoint(temperature, humidity)
+        : avg(readings.map(r => r.dewpoint));
+
       current = {
         temperature: temperature !== null ? Math.round(temperature * 10) / 10 : null,
-        humidity: avg(readings.map(r => r.humidity)) !== null ? Math.round(avg(readings.map(r => r.humidity))!) : null,
+        humidity: humidity !== null ? Math.round(humidity) : null,
         pressure: avg(readings.map(r => r.pressure)) !== null ? Math.round(avg(readings.map(r => r.pressure))! * 10) / 10 : null,
-        dewpoint: avg(readings.map(r => r.dewpoint)) !== null ? Math.round(avg(readings.map(r => r.dewpoint))! * 10) / 10 : null,
+        dewpoint: dewpoint !== null ? Math.round(dewpoint * 10) / 10 : null,
         wind_speed: avg(readings.map(r => r.wind_speed)) !== null ? Math.round(avg(readings.map(r => r.wind_speed))! * 10) / 10 : null,
         wind_gust: Math.max(...readings.map(r => r.wind_gust ?? 0)) || null,
         wind_direction: parseInt(mode(readings.map(r => r.wind_direction?.toString() ?? null)) || "0") || null,
@@ -343,17 +353,25 @@ export async function GET(request: NextRequest) {
 
       weatherHistory = Array.from(windows.entries())
         .sort((a, b) => a[0] - b[0])
-        .map(([, w]) => ({
-          timestamp: w.timestamp,
-          temperature: avg(w.temperature),
-          humidity: avg(w.humidity),
-          pressure: avg(w.pressure),
-          dewpoint: avg(w.dewpoint),
-          wind_speed: avg(w.wind_speed),
-          wind_gust: max(w.wind_gust),
-          sky_temp: avg(w.sky_temp),
-          ambient_temp: avg(w.ambient_temp),
-        }));
+        .map(([, w]) => {
+          const temperature = avg(w.temperature);
+          const humidity = avg(excludeOutliers(w.humidity, HUMIDITY_OUTLIER_DEVIATION));
+          const dewpoint = temperature !== null && humidity !== null
+            ? calculateDewPoint(temperature, humidity)
+            : avg(w.dewpoint);
+
+          return {
+            timestamp: w.timestamp,
+            temperature,
+            humidity,
+            pressure: avg(w.pressure),
+            dewpoint,
+            wind_speed: avg(w.wind_speed),
+            wind_gust: max(w.wind_gust),
+            sky_temp: avg(w.sky_temp),
+            ambient_temp: avg(w.ambient_temp),
+          };
+        });
     }
 
     // Get telemetry health from KV state FIRST
