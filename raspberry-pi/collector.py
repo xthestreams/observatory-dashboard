@@ -1010,6 +1010,14 @@ class PowerStatusTracker:
         """Mark UPS as offline/unreachable."""
         with self._lock:
             self._status = "down"
+            # Clear readings from the last successful poll so the dashboard
+            # doesn't present stale values (e.g. "OL", 238V) as current
+            self._battery_charge = None
+            self._battery_runtime = None
+            self._input_voltage = None
+            self._output_voltage = None
+            self._ups_status = None
+            self._ups_load = None
             self._last_update = datetime.utcnow()
 
     def get_status(self) -> Dict[str, Any]:
